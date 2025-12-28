@@ -2,7 +2,7 @@ const API_BASE_URL = 'https://www.alphavantage.co/query';
 const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
 
 // Cache configuration
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const CACHE_KEY_PREFIX = 'stock_quote_';
 const CHART_CACHE_PREFIX = 'stock_chart_';
 

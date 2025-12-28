@@ -19,11 +19,18 @@ const Dashboard = () => {
     ? Math.round((progress.loaded / progress.total) * 100)
     : 0;
 
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+
   return (
     <div className="min-h-screen w-full bg-gray-900 flex flex-col">
       <div className="px-8 py-4">
         <h1 className="text-6xl font-bold text-white text-center mb-8">
           Stock Price Dashboard
+          {isDemoMode && (
+            <span className="ml-4 text-2xl text-yellow-400 font-normal">
+              (DEMO MODE)
+            </span>
+          )}
         </h1>
 
         <div className="flex justify-between items-center bg-gray-800 p-4 rounded-lg mb-6 max-w-7xl mx-auto w-full">
@@ -71,8 +78,9 @@ const Dashboard = () => {
                 <p className="font-semibold mb-1">Tips:</p>
                 <ul className="list-disc list-inside space-y-1">
                   <li>Your API limit will reset in 24 hours</li>
-                  <li>Refresh the page to load cached data (valid for 5 minutes)</li>
+                  <li>Refresh the page to load cached data (valid for 24 hours)</li>
                   <li>Cached data loads instantly without using API calls</li>
+                  <li>Enable DEMO_MODE in .env.local to use mock data for testing</li>
                 </ul>
               </div>
             )}
@@ -81,7 +89,7 @@ const Dashboard = () => {
       </div>
 
       <div className="w-full flex-1 flex flex-col gap-6 px-8 pb-8">
-        <StockChart symbol="AAPL" />
+        <StockChart symbol="AAPL" days={30} />
         <StockTable stocks={stocks} loading={loading} />
       </div>
     </div>
