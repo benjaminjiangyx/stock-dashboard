@@ -5,12 +5,30 @@ export const useStockData = (symbols) => {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [progress, setProgress] = useState({
+    loaded: 0,
+    total: 0,
+    currentSymbol: '',
+    status: '',
+    message: ''
+  });
 
   const fetchStocks = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const quotes = await fetchMultipleQuotes(symbols);
+      setProgress({
+        loaded: 0,
+        total: symbols.length,
+        currentSymbol: '',
+        status: 'loading',
+        message: 'Starting...'
+      });
+
+      const quotes = await fetchMultipleQuotes(symbols, (progressInfo) => {
+        setProgress(progressInfo);
+      });
+
       setStocks(quotes);
     } catch (err) {
       setError(err.message);
@@ -24,5 +42,5 @@ export const useStockData = (symbols) => {
     fetchStocks();
   }, [fetchStocks]);
 
-  return { stocks, loading, error, refetch: fetchStocks };
+  return { stocks, loading, error, progress, refetch: fetchStocks };
 };
