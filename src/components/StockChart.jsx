@@ -5,68 +5,59 @@ import {
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
-import { fetchQuote } from '../services/finnhubApi';
+import { Line } from 'react-chartjs-2';
+import { fetchDailyTimeSeries } from '../services/alphaVantageApi';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
-const StockChart = ({ symbol = 'AAPL' }) => {
+const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [tradingDate, setTradingDate] = useState(null);
 
   useEffect(() => {
     const loadChartData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const quote = await fetchQuote(symbol);
+        const timeSeries = await fetchDailyTimeSeries(symbol, days);
 
-        // Get trading date
-        const tradingDay = new Date(quote.t * 1000);
-        setTradingDate(tradingDay.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }));
+        const labels = timeSeries.map(data => {
+          const date = new Date(data.date);
+          return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          });
+        });
 
-        // Create a simple bar chart with available data points
+        const prices = timeSeries.map(data => data.close);
+
         setChartData({
-          labels: ['Previous Close', 'Open', 'Low', 'Current', 'High'],
+          labels,
           datasets: [
             {
-              label: `${symbol} Price ($)`,
-              data: [quote.pc, quote.o, quote.l, quote.c, quote.h],
-              backgroundColor: [
-                'rgba(156, 163, 175, 0.7)',  // gray for prev close
-                'rgba(59, 130, 246, 0.7)',   // blue for open
-                'rgba(239, 68, 68, 0.7)',    // red for low
-                'rgba(59, 130, 246, 0.9)',   // bright blue for current
-                'rgba(34, 197, 94, 0.7)',    // green for high
-              ],
-              borderColor: [
-                'rgb(156, 163, 175)',
-                'rgb(59, 130, 246)',
-                'rgb(239, 68, 68)',
-                'rgb(59, 130, 246)',
-                'rgb(34, 197, 94)',
-              ],
+              label: `${symbol} Closing Price`,
+              data: prices,
+              borderColor: 'rgb(59, 130, 246)',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 2,
+              pointHoverRadius: 6,
               borderWidth: 2,
             },
           ],
@@ -79,7 +70,7 @@ const StockChart = ({ symbol = 'AAPL' }) => {
     };
 
     loadChartData();
-  }, [symbol]);
+  }, [symbol, days]);
 
   if (loading) {
     return (
@@ -153,14 +144,11 @@ const StockChart = ({ symbol = 'AAPL' }) => {
 
   return (
     <div className="w-full bg-gray-800 rounded-lg p-6">
-      <h2 className="text-2xl font-bold text-white mb-2">
-        {symbol} - Trading Day Summary
+      <h2 className="text-2xl font-bold text-white mb-4">
+        {symbol} - Last {days} Days
       </h2>
-      {tradingDate && (
-        <p className="text-gray-400 text-sm mb-4">{tradingDate}</p>
-      )}
       <div className="h-96">
-        {chartData && <Bar data={chartData} options={options} />}
+        {chartData && <Line data={chartData} options={options} />}
       </div>
     </div>
   );

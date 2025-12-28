@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchMultipleQuotes } from '../services/finnhubApi';
+import { fetchMultipleQuotes } from '../services/alphaVantageApi';
 
 export const useStockData = (symbols) => {
   const [stocks, setStocks] = useState([]);
