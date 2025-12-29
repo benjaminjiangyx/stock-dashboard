@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { popularStocks, loadPopularStocks, getPopularStocks } from "../data/popularStocks";
+import { fetchQuote } from "../services/alphaVantageApi";
 
 const StockManager = ({
   symbols,
@@ -8,15 +10,67 @@ const StockManager = ({
 }) => {
   const [inputValue, setInputValue] = useState("");
   const [error, setError] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [allStocks, setAllStocks] = useState(popularStocks);
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Load full listing on mount
+  useEffect(() => {
+    loadPopularStocks().then((stocks) => {
+      setAllStocks(stocks);
+      console.log(`Loaded ${stocks.length} stocks for autocomplete`);
+    });
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const validateSymbol = (symbol) => {
-    // Basic validation: 1-5 uppercase letters
-    const symbolRegex = /^[A-Z]{1,5}$/;
+    // Basic validation: 1-5 uppercase letters (allowing dots for some symbols like BRK.B)
+    const symbolRegex = /^[A-Z.]{1,6}$/;
     return symbolRegex.test(symbol);
   };
 
-  const handleAdd = () => {
-    const symbol = inputValue.trim().toUpperCase();
+  const updateSuggestions = (value) => {
+    const upperValue = value.toUpperCase();
+    if (!upperValue) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    const filtered = allStocks
+      .filter(
+        (stock) =>
+          stock.symbol.startsWith(upperValue) ||
+          stock.name.toUpperCase().includes(upperValue)
+      )
+      .slice(0, 8); // Limit to 8 suggestions
+
+    setSuggestions(filtered);
+    setShowDropdown(filtered.length > 0);
+    setSelectedIndex(-1);
+  };
+
+  const handleAdd = async (symbolToAdd) => {
+    const symbol = (symbolToAdd || inputValue).trim().toUpperCase();
 
     if (!symbol) {
       setError("Please enter a stock symbol");
@@ -24,7 +78,7 @@ const StockManager = ({
     }
 
     if (!validateSymbol(symbol)) {
-      setError("Invalid symbol format (1-5 uppercase letters)");
+      setError("Invalid symbol format");
       return;
     }
 
@@ -33,10 +87,21 @@ const StockManager = ({
       return;
     }
 
-    const newSymbols = [...symbols, symbol];
-    onSymbolsChange(newSymbols);
-    setInputValue("");
-    setError("");
+    // Validate symbol with API before adding
+    try {
+      setError("Validating symbol...");
+      await fetchQuote(symbol, false); // Don't use cache for validation
+
+      // If API call succeeds, add to watchlist
+      const newSymbols = [...symbols, symbol];
+      onSymbolsChange(newSymbols);
+      onSymbolSelect(symbol); // Automatically switch to the new symbol
+      setInputValue("");
+      setError("");
+      setShowDropdown(false);
+    } catch (err) {
+      setError(`Invalid symbol: ${err.message}`);
+    }
   };
 
   const handleRemove = (symbolToRemove) => {
@@ -57,28 +122,75 @@ const StockManager = ({
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
-      handleAdd();
+      if (selectedIndex >= 0 && suggestions[selectedIndex]) {
+        handleAdd(suggestions[selectedIndex].symbol);
+      } else {
+        handleAdd();
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+      setSelectedIndex(-1);
     }
+  };
+
+  const handleInputChange = (e) => {
+    const value = e.target.value.toUpperCase();
+    setInputValue(value);
+    setError("");
+    updateSuggestions(value);
+  };
+
+  const handleSuggestionClick = (symbol) => {
+    handleAdd(symbol);
   };
 
   return (
     <div className="bg-gray-800 rounded-lg p-6 mb-6">
       <h2 className="text-xl font-bold text-white mb-4"> Manage Watchlist</h2>
 
-      <div className="flex gap-3">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => {
-            setInputValue(e.target.value.toUpperCase());
-            setError("");
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Enter symbol (e.g., TSLA)"
-          className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          maxLength={5}
-        />
-        <button onClick={handleAdd} className="btn-primary px-6">
+      <div className="flex gap-3 relative">
+        <div className="flex-1 relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Enter symbol (e.g., TSLA)"
+            className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            maxLength={6}
+          />
+          {showDropdown && suggestions.length > 0 && (
+            <div
+              ref={dropdownRef}
+              className="absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto"
+            >
+              {suggestions.map((stock, index) => (
+                <div
+                  key={stock.symbol}
+                  onClick={() => handleSuggestionClick(stock.symbol)}
+                  className={`px-4 py-2 cursor-pointer transition-colors ${
+                    index === selectedIndex
+                      ? "bg-blue-600 text-white"
+                      : "hover:bg-gray-600 text-gray-200"
+                  }`}
+                >
+                  <div className="font-semibold">{stock.symbol}</div>
+                  <div className="text-xs text-gray-400">{stock.name}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={() => handleAdd()} className="btn-primary px-6">
           Add Stock
         </button>
       </div>

@@ -5,6 +5,8 @@ const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 const CACHE_KEY_PREFIX = "stock_quote_";
 const CHART_CACHE_PREFIX = "stock_chart_";
+const LISTING_CACHE_KEY = "stock_listing_status";
+const LISTING_CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Cache utilities
 const getCachedData = (key) => {
@@ -223,4 +225,87 @@ export const fetchDailyTimeSeries = async (
   setCachedData(cacheKey, result);
 
   return result;
+};
+
+export const fetchListingStatus = async () => {
+  // Check cache first - use longer cache duration for listing data
+  const cached = localStorage.getItem(LISTING_CACHE_KEY);
+  if (cached) {
+    try {
+      const { data, timestamp } = JSON.parse(cached);
+      const isValid = Date.now() - timestamp < LISTING_CACHE_DURATION;
+
+      if (isValid) {
+        console.log('Cache hit for listing status');
+        return data;
+      }
+    } catch (error) {
+      console.warn('Cache read error for listing status:', error);
+    }
+  }
+
+  console.log('Fetching listing status from API...');
+  const response = await fetch(
+    `${API_BASE_URL}?function=LISTING_STATUS&apikey=${API_KEY}`
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch listing status: ${response.statusText}`);
+  }
+
+  // The response is a CSV file
+  const csvText = await response.text();
+
+  // Parse CSV to array of objects
+  const lines = csvText.trim().split('\n');
+  const headers = lines[0].split(',');
+
+  // Check for API errors in the FIRST line only (not in company names)
+  const firstLine = lines[0] || '';
+  if (firstLine.includes('Error Message') || firstLine.includes('Information') || firstLine.includes('Note:')) {
+    console.error('API Error Response:', csvText.substring(0, 500));
+    throw new Error('API limit reached or error occurred');
+  }
+
+  console.log('CSV Headers:', headers);
+  console.log('First data line:', lines[1]);
+  console.log('Total lines:', lines.length);
+
+  const listings = lines.slice(1).map(line => {
+    const values = line.split(',');
+    const obj = {};
+    headers.forEach((header, index) => {
+      obj[header] = values[index];
+    });
+    return obj;
+  }).filter(listing =>
+    // Only include active US stocks
+    listing.assetType === 'Stock' &&
+    (listing.exchange === 'NASDAQ' || listing.exchange === 'NYSE' || listing.exchange === 'AMEX')
+  ).map(listing => ({
+    symbol: listing.symbol,
+    name: listing.name
+  }));
+
+  console.log('Listings before filter:', lines.length - 1);
+  console.log('Listings after filter:', listings.length);
+  console.log('Sample listing:', listings[0]);
+
+  // Don't cache if no valid listings found
+  if (listings.length === 0) {
+    console.error('No listings found after filtering. Headers:', headers);
+    throw new Error('No valid listings found');
+  }
+
+  // Cache the result
+  try {
+    localStorage.setItem(
+      LISTING_CACHE_KEY,
+      JSON.stringify({ data: listings, timestamp: Date.now() })
+    );
+  } catch (error) {
+    console.warn('Cache write error for listing status:', error);
+  }
+
+  return listings;
 };
