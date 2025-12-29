@@ -75,3 +75,10 @@ body {
     @apply px-6 py-4 text-xl;
   }
 }
+
+/* Hide lightweight-charts watermark */
+div[class*="tv-lightweight-charts"] a[href*="tradingview"],
+div[class*="tv-lightweight-charts"] a[href*="lightweight-charts"] {
+  display: none !important;
+  visibility: hidden !important;
+}
