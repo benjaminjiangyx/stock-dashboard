@@ -21,7 +21,6 @@ const StockManager = ({
   useEffect(() => {
     loadPopularStocks().then((stocks) => {
       setAllStocks(stocks);
-      console.log(`Loaded ${stocks.length} stocks for autocomplete`);
     });
   }, []);
 
@@ -57,12 +56,7 @@ const StockManager = ({
     }
 
     const filtered = allStocks
-      .filter(
-        (stock) =>
-          stock.symbol.startsWith(upperValue) ||
-          stock.name.toUpperCase().includes(upperValue)
-      )
-      .slice(0, 8); // Limit to 8 suggestions
+      .filter((stock) => stock.symbol.startsWith(upperValue));
 
     setSuggestions(filtered);
     setShowDropdown(filtered.length > 0);

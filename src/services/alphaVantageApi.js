@@ -41,6 +41,8 @@ export const fetchQuote = async (symbol, useCache = true) => {
       console.log(`Cache hit for ${symbol}`);
       return cached;
     }
+  } else {
+    console.log(`Bypassing cache for ${symbol} - fetching fresh data`);
   }
 
   const response = await fetch(
@@ -97,61 +99,76 @@ export const fetchQuote = async (symbol, useCache = true) => {
   return result;
 };
 
-export const fetchMultipleQuotes = async (symbols, onProgress = null) => {
-  try {
-    const quotes = [];
-    const BATCH_SIZE = 5;
-    const WAIT_BETWEEN_BATCHES = 61000; // 61 seconds
+export const fetchMultipleQuotes = async (symbols, onProgress = null, useCache = true) => {
+  const quotes = [];
+  const errors = [];
+  const BATCH_SIZE = 5;
+  const WAIT_BETWEEN_BATCHES = 61000; // 61 seconds
 
-    // Process in batches of 5 to respect rate limits (5 per minute)
-    for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
-      const batch = symbols.slice(i, i + BATCH_SIZE);
+  // Process in batches of 5 to respect rate limits (5 per minute)
+  for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+    const batch = symbols.slice(i, i + BATCH_SIZE);
 
-      // If not the first batch, wait before proceeding
-      if (i > 0) {
-        if (onProgress) {
-          onProgress({
-            status: "waiting",
-            message: `Waiting 60s for API rate limit...`,
-            loaded: i,
-            total: symbols.length,
-            currentSymbol: "",
-          });
-        }
-        await new Promise((resolve) =>
-          setTimeout(resolve, WAIT_BETWEEN_BATCHES)
-        );
+    // If not the first batch, wait before proceeding
+    if (i > 0) {
+      if (onProgress) {
+        onProgress({
+          status: "waiting",
+          message: `Waiting 60s for API rate limit...`,
+          loaded: i,
+          total: symbols.length,
+          currentSymbol: "",
+        });
       }
-
-      // Fetch batch with minimal delays (500ms between each request)
-      for (let j = 0; j < batch.length; j++) {
-        const symbol = batch[j];
-        const overallIndex = i + j;
-
-        if (onProgress) {
-          onProgress({
-            status: "loading",
-            currentSymbol: symbol,
-            loaded: overallIndex,
-            total: symbols.length,
-            message: `Loading ${symbol}...`,
-          });
-        }
-
-        const quote = await fetchQuote(symbol);
-        quotes.push(quote);
-
-        // Small delay between requests within batch (safety buffer)
-        if (j < batch.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, WAIT_BETWEEN_BATCHES)
+      );
     }
 
-    return quotes;
-  } catch (error) {
-    throw new Error(`Error fetching quotes: ${error.message}`);
+    // Fetch batch with minimal delays (500ms between each request)
+    for (let j = 0; j < batch.length; j++) {
+      const symbol = batch[j];
+      const overallIndex = i + j;
+
+      if (onProgress) {
+        onProgress({
+          status: "loading",
+          currentSymbol: symbol,
+          loaded: overallIndex,
+          total: symbols.length,
+          message: `Loading ${symbol}...`,
+        });
+      }
+
+      try {
+        const quote = await fetchQuote(symbol, useCache);
+        quotes.push(quote);
+      } catch (error) {
+        console.warn(`Failed to fetch ${symbol}:`, error.message);
+        errors.push({ symbol, error: error.message });
+      }
+
+      // Small delay between requests within batch (safety buffer)
+      if (j < batch.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
   }
+
+  // If we got some quotes, return them even if some failed
+  if (quotes.length > 0) {
+    if (errors.length > 0) {
+      console.warn(`Successfully loaded ${quotes.length}/${symbols.length} stocks from cache`);
+    }
+    return quotes;
+  }
+
+  // If ALL quotes failed, throw an error
+  if (errors.length > 0) {
+    throw new Error(`Error fetching quotes: ${errors[0].error}`);
+  }
+
+  return quotes;
 };
 
 export const fetchDailyTimeSeries = async (
@@ -167,6 +184,8 @@ export const fetchDailyTimeSeries = async (
       console.log(`Cache hit for chart ${symbol}`);
       return cached;
     }
+  } else {
+    console.log(`Bypassing cache for chart ${symbol} - fetching fresh data`);
   }
 
   const response = await fetch(
@@ -279,8 +298,8 @@ export const fetchListingStatus = async () => {
     });
     return obj;
   }).filter(listing =>
-    // Only include active US stocks
-    listing.assetType === 'Stock' &&
+    // Include US stocks and ETFs
+    (listing.assetType === 'Stock' || listing.assetType === 'ETF') &&
     (listing.exchange === 'NASDAQ' || listing.exchange === 'NYSE' || listing.exchange === 'AMEX')
   ).map(listing => ({
     symbol: listing.symbol,

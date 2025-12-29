@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import { fetchDailyTimeSeries } from '../services/alphaVantageApi';
 
-const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
+const StockChart = ({ symbol = 'AAPL', days = 30, refreshTrigger = 0 }) => {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const resizeObserverRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [latestData, setLatestData] = useState(null);
+  const previousRefreshTrigger = useRef(refreshTrigger);
 
   useEffect(() => {
     let isMounted = true;
@@ -35,7 +36,12 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
         setLoading(true);
         setError(null);
 
-        const timeSeries = await fetchDailyTimeSeries(symbol, days);
+        // Check if this is a refresh (refreshTrigger changed) or a symbol change
+        const isRefresh = refreshTrigger !== previousRefreshTrigger.current;
+        previousRefreshTrigger.current = refreshTrigger;
+
+        // Bypass cache on refresh, use cache on symbol change
+        const timeSeries = await fetchDailyTimeSeries(symbol, days, !isRefresh);
 
         if (!isMounted || !chartContainerRef.current) {
           return;
@@ -215,7 +221,7 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
       isMounted = false;
       cleanup();
     };
-  }, [symbol, days]);
+  }, [symbol, days, refreshTrigger]);
 
   return (
     <div className="w-full bg-gray-800 rounded-lg p-6">
@@ -227,23 +233,23 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
         <div className="bg-gray-700 rounded-lg p-3 mb-4 grid grid-cols-5 gap-4 text-sm">
           <div>
             <div className="text-gray-400">Open</div>
-            <div className="text-white font-semibold">${latestData.open.toFixed(2)}</div>
+            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>${latestData.open.toFixed(2)}</div>
           </div>
           <div>
             <div className="text-gray-400">High</div>
-            <div className="text-green-400 font-semibold">${latestData.high.toFixed(2)}</div>
+            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>${latestData.high.toFixed(2)}</div>
           </div>
           <div>
             <div className="text-gray-400">Low</div>
-            <div className="text-red-400 font-semibold">${latestData.low.toFixed(2)}</div>
+            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>${latestData.low.toFixed(2)}</div>
           </div>
           <div>
             <div className="text-gray-400">Close</div>
-            <div className="text-white font-semibold">${latestData.close.toFixed(2)}</div>
+            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>${latestData.close.toFixed(2)}</div>
           </div>
           <div>
             <div className="text-gray-400">Volume</div>
-            <div className="text-white font-semibold">{(latestData.volume / 1000000).toFixed(2)}M</div>
+            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>{(latestData.volume / 1000000).toFixed(2)}M</div>
           </div>
         </div>
       )}
@@ -254,8 +260,16 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
         </div>
       )}
       {error && (
-        <div className="text-center py-12 text-red-400 h-96">
-          Error loading chart: {error}
+        <div className="flex flex-col items-center justify-center h-96 text-gray-400">
+          <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <div className="text-lg font-semibold mb-2">Chart Data Unavailable</div>
+          <div className="text-sm text-gray-500">
+            {error.includes("API limit") || error.includes("daily limit")
+              ? "Chart data will be available when API limit resets or from cache"
+              : "Unable to load chart data at this time"}
+          </div>
         </div>
       )}
       <div ref={chartContainerRef} className="h-96" style={{ display: loading || error ? 'none' : 'block' }} />

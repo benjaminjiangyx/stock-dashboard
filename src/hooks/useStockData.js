@@ -13,7 +13,7 @@ export const useStockData = (symbols) => {
     message: ''
   });
 
-  const fetchStocks = useCallback(async () => {
+  const fetchStocks = useCallback(async (useCache = true) => {
     try {
       setLoading(true);
       setError(null);
@@ -27,7 +27,7 @@ export const useStockData = (symbols) => {
 
       const quotes = await fetchMultipleQuotes(symbols, (progressInfo) => {
         setProgress(progressInfo);
-      });
+      }, useCache);
 
       setStocks(quotes);
     } catch (err) {

@@ -44,6 +44,7 @@ const Dashboard = () => {
   );
   const { stocks, loading, error, progress, refetch } = useStockData(symbols);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [chartRefreshTrigger, setChartRefreshTrigger] = useState(0);
 
   // Save symbols to localStorage whenever they change
   useEffect(() => {
@@ -56,8 +57,25 @@ const Dashboard = () => {
   }, [selectedSymbol]);
 
   const handleRefresh = () => {
-    refetch();
+    console.log('Refresh clicked - clearing all caches');
+
+    // Clear all chart and quote caches from localStorage
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('stock_chart_') || key.startsWith('stock_quote_'))) {
+        keysToRemove.push(key);
+      }
+    }
+
+    console.log(`Removing ${keysToRemove.length} cached items:`, keysToRemove);
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+    // Refetch all data bypassing cache
+    console.log('Triggering refetch with useCache=false');
+    refetch(false);
     setLastUpdated(new Date());
+    setChartRefreshTrigger(prev => prev + 1);
   };
 
   const handleSymbolsChange = (newSymbols) => {
@@ -149,7 +167,7 @@ const Dashboard = () => {
           selectedSymbol={selectedSymbol}
           onSymbolSelect={handleSymbolSelect}
         />
-        <StockChart symbol={selectedSymbol} days={30} />
+        <StockChart symbol={selectedSymbol} days={30} refreshTrigger={chartRefreshTrigger} />
         <StockTable stocks={stocks} loading={loading} />
       </div>
     </div>
