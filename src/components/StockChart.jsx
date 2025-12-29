@@ -5,34 +5,29 @@ import { fetchDailyTimeSeries } from '../services/alphaVantageApi';
 const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
-  const isInitializedRef = useRef(false);
+  const resizeObserverRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!chartContainerRef.current) {
-      return;
-    }
-
-    // Check if chart already exists and clean it up FIRST
-    if (chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
-    }
-
-    // Clear any leftover DOM elements
-    if (chartContainerRef.current) {
-      chartContainerRef.current.innerHTML = '';
-    }
-
-    // Prevent double initialization
-    if (isInitializedRef.current) {
-      return;
-    }
-    isInitializedRef.current = true;
-
+    let isMounted = true;
     let chart = null;
     let resizeHandler = null;
+
+    const cleanup = () => {
+      if (resizeHandler) {
+        window.removeEventListener('resize', resizeHandler);
+      }
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
+      if (chart) {
+        chart.remove();
+        chart = null;
+      }
+      chartRef.current = null;
+    };
 
     const loadChartData = async () => {
       try {
@@ -40,6 +35,10 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
         setError(null);
 
         const timeSeries = await fetchDailyTimeSeries(symbol, days);
+
+        if (!isMounted || !chartContainerRef.current) {
+          return;
+        }
 
         // Create chart
         const containerWidth = chartContainerRef.current.clientWidth || chartContainerRef.current.offsetWidth || 800;
@@ -107,7 +106,7 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
         window.addEventListener('resize', resizeHandler);
 
         // Use ResizeObserver for more responsive resizing
-        const resizeObserver = new ResizeObserver((entries) => {
+        resizeObserverRef.current = new ResizeObserver((entries) => {
           if (chart && entries[0]) {
             const newWidth = entries[0].contentRect.width || 800;
             chart.applyOptions({
@@ -117,11 +116,8 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
         });
 
         if (chartContainerRef.current) {
-          resizeObserver.observe(chartContainerRef.current);
+          resizeObserverRef.current.observe(chartContainerRef.current);
         }
-
-        // Store resizeObserver for cleanup
-        chart.resizeObserver = resizeObserver;
 
         // Trigger an immediate resize to ensure proper sizing
         setTimeout(() => {
@@ -139,30 +135,17 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
       }
     };
 
+    // Clear any existing chart before loading new one
+    if (chartContainerRef.current) {
+      chartContainerRef.current.innerHTML = '';
+    }
+
     loadChartData();
 
     // Cleanup function
     return () => {
-      if (resizeHandler) {
-        window.removeEventListener('resize', resizeHandler);
-      }
-      if (chart) {
-        if (chart.resizeObserver) {
-          chart.resizeObserver.disconnect();
-        }
-        chart.remove();
-      }
-      if (chartRef.current) {
-        if (chartRef.current.resizeObserver) {
-          chartRef.current.resizeObserver.disconnect();
-        }
-        chartRef.current.remove();
-        chartRef.current = null;
-      }
-      // Reset after cleanup
-      setTimeout(() => {
-        isInitializedRef.current = false;
-      }, 0);
+      isMounted = false;
+      cleanup();
     };
   }, [symbol, days]);
 

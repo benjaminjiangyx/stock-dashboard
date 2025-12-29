@@ -1,17 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStockData } from '../hooks/useStockData';
 import StockTable from './StockTable';
 import StockChart from './StockChart';
+import StockManager from './StockManager';
 
-const STOCK_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL'];
+const DEFAULT_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL'];
+const STORAGE_KEY = 'stock_watchlist';
+const SELECTED_SYMBOL_KEY = 'selected_stock_symbol';
+
+// Load symbols from localStorage or use defaults
+const loadSymbols = () => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SYMBOLS;
+    }
+  } catch (error) {
+    console.warn('Error loading symbols from localStorage:', error);
+  }
+  return DEFAULT_SYMBOLS;
+};
+
+// Load selected symbol from localStorage or use first symbol
+const loadSelectedSymbol = (symbols) => {
+  try {
+    const saved = localStorage.getItem(SELECTED_SYMBOL_KEY);
+    if (saved && symbols.includes(saved)) {
+      return saved;
+    }
+  } catch (error) {
+    console.warn('Error loading selected symbol:', error);
+  }
+  return symbols[0];
+};
 
 const Dashboard = () => {
-  const { stocks, loading, error, progress, refetch } = useStockData(STOCK_SYMBOLS);
+  const [symbols, setSymbols] = useState(loadSymbols);
+  const [selectedSymbol, setSelectedSymbol] = useState(() => loadSelectedSymbol(symbols));
+  const { stocks, loading, error, progress, refetch } = useStockData(symbols);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+
+  // Save symbols to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(symbols));
+  }, [symbols]);
+
+  // Save selected symbol to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(SELECTED_SYMBOL_KEY, selectedSymbol);
+  }, [selectedSymbol]);
 
   const handleRefresh = () => {
     refetch();
     setLastUpdated(new Date());
+  };
+
+  const handleSymbolsChange = (newSymbols) => {
+    setSymbols(newSymbols);
+  };
+
+  const handleSymbolSelect = (symbol) => {
+    setSelectedSymbol(symbol);
   };
 
   // Calculate progress percentage
@@ -89,7 +139,13 @@ const Dashboard = () => {
       </div>
 
       <div className="w-full flex-1 flex flex-col gap-6 px-8 pb-8">
-        <StockChart symbol="AAPL" days={30} />
+        <StockManager
+          symbols={symbols}
+          onSymbolsChange={handleSymbolsChange}
+          selectedSymbol={selectedSymbol}
+          onSymbolSelect={handleSymbolSelect}
+        />
+        <StockChart symbol={selectedSymbol} days={30} />
         <StockTable stocks={stocks} loading={loading} />
       </div>
     </div>
