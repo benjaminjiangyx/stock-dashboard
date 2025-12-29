@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createChart, CandlestickSeries } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import { fetchDailyTimeSeries } from '../services/alphaVantageApi';
 
 const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
@@ -8,6 +8,7 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
   const resizeObserverRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [latestData, setLatestData] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -57,6 +58,10 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
           timeScale: {
             timeVisible: true,
             secondsVisible: false,
+            rightOffset: 0,
+            lockVisibleTimeRangeOnResize: true,
+            rightBarStaysOnScroll: true,
+            minBarSpacing: 0.5,
           },
         });
 
@@ -72,6 +77,31 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
           wickDownColor: 'rgb(239, 68, 68)',
         });
 
+        // Add volume histogram series
+        const volumeSeries = chart.addSeries(HistogramSeries, {
+          color: 'rgba(76, 175, 254, 0.5)',
+          priceFormat: {
+            type: 'volume',
+          },
+          priceScaleId: 'volume',
+        });
+
+        // Configure the volume price scale to take up ~25% at the bottom
+        volumeSeries.priceScale().applyOptions({
+          scaleMargins: {
+            top: 0.75, // Volume starts at 75% from top (bottom 25%)
+            bottom: 0,
+          },
+        });
+
+        // Configure the candlestick price scale to take up ~75% at the top
+        candlestickSeries.priceScale().applyOptions({
+          scaleMargins: {
+            top: 0.1,
+            bottom: 0.3, // Leave 30% for volume
+          },
+        });
+
         // Convert data to lightweight-charts format
         const candleData = timeSeries.map(data => ({
           time: data.date, // lightweight-charts expects 'YYYY-MM-DD' format
@@ -81,10 +111,48 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
           close: data.close,
         }));
 
-        candlestickSeries.setData(candleData);
+        const volumeData = timeSeries.map(data => ({
+          time: data.date,
+          value: data.volume,
+          color: data.close >= data.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+        }));
 
-        // Fit content
+        candlestickSeries.setData(candleData);
+        volumeSeries.setData(volumeData);
+
+        // Store the latest (most recent) data for OHLCV display
+        const latest = timeSeries[timeSeries.length - 1];
+        setLatestData(latest);
+
+        // Fit all data to the visible range
         chart.timeScale().fitContent();
+
+        // Subscribe to crosshair move to update OHLCV on hover
+        chart.subscribeCrosshairMove((param) => {
+          if (!isMounted) {
+            return;
+          }
+
+          // If crosshair moved outside the chart or no data, reset to latest
+          if (!param.time || !param.seriesData) {
+            setLatestData(latest);
+            return;
+          }
+
+          const data = param.seriesData.get(candlestickSeries);
+          if (data) {
+            // Find the corresponding time series entry to get volume
+            const dateStr = param.time;
+            const matchingData = timeSeries.find(d => d.date === dateStr);
+
+            if (matchingData) {
+              setLatestData(matchingData);
+            }
+          } else {
+            // No data at this point, reset to latest
+            setLatestData(latest);
+          }
+        });
 
         setLoading(false);
 
@@ -154,6 +222,32 @@ const StockChart = ({ symbol = 'AAPL', days = 30 }) => {
       <h2 className="text-2xl font-bold text-white mb-4">
         {symbol} - Last {days} Days
       </h2>
+
+      {latestData && !loading && !error && (
+        <div className="bg-gray-700 rounded-lg p-3 mb-4 grid grid-cols-5 gap-4 text-sm">
+          <div>
+            <div className="text-gray-400">Open</div>
+            <div className="text-white font-semibold">${latestData.open.toFixed(2)}</div>
+          </div>
+          <div>
+            <div className="text-gray-400">High</div>
+            <div className="text-green-400 font-semibold">${latestData.high.toFixed(2)}</div>
+          </div>
+          <div>
+            <div className="text-gray-400">Low</div>
+            <div className="text-red-400 font-semibold">${latestData.low.toFixed(2)}</div>
+          </div>
+          <div>
+            <div className="text-gray-400">Close</div>
+            <div className="text-white font-semibold">${latestData.close.toFixed(2)}</div>
+          </div>
+          <div>
+            <div className="text-gray-400">Volume</div>
+            <div className="text-white font-semibold">{(latestData.volume / 1000000).toFixed(2)}M</div>
+          </div>
+        </div>
+      )}
+
       {loading && (
         <div className="flex justify-center items-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>

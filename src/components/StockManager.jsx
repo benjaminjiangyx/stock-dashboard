@@ -63,7 +63,7 @@ const StockManager = ({
 
   return (
     <div className="bg-gray-800 rounded-lg p-6 mb-6">
-      <h2 className="text-xl font-bold text-white mb-4">Manage Watchlist</h2>
+      <h2 className="text-xl font-bold text-white mb-4"> Manage Watchlist</h2>
 
       <div className="flex gap-3">
         <input
