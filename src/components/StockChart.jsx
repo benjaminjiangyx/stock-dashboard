@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import { fetchDailyTimeSeries } from '../services/alphaVantageApi';
 
-const StockChart = ({ symbol = 'AAPL', days = 30, refreshTrigger = 0 }) => {
+const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const resizeObserverRef = useRef(null);
@@ -41,7 +41,7 @@ const StockChart = ({ symbol = 'AAPL', days = 30, refreshTrigger = 0 }) => {
         previousRefreshTrigger.current = refreshTrigger;
 
         // Bypass cache on refresh, use cache on symbol change
-        const timeSeries = await fetchDailyTimeSeries(symbol, days, !isRefresh);
+        const timeSeries = await fetchDailyTimeSeries(symbol, !isRefresh);
 
         if (!isMounted || !chartContainerRef.current) {
           return;
@@ -221,12 +221,12 @@ const StockChart = ({ symbol = 'AAPL', days = 30, refreshTrigger = 0 }) => {
       isMounted = false;
       cleanup();
     };
-  }, [symbol, days, refreshTrigger]);
+  }, [symbol, refreshTrigger]);
 
   return (
     <div className="w-full bg-gray-800 rounded-lg p-6">
       <h2 className="text-2xl font-bold text-white mb-4">
-        {symbol} - Last {days} Days
+        {symbol}
       </h2>
 
       {latestData && !loading && !error && (

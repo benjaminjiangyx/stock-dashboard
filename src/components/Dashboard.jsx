@@ -167,7 +167,7 @@ const Dashboard = () => {
           selectedSymbol={selectedSymbol}
           onSymbolSelect={handleSymbolSelect}
         />
-        <StockChart symbol={selectedSymbol} days={30} refreshTrigger={chartRefreshTrigger} />
+        <StockChart symbol={selectedSymbol} refreshTrigger={chartRefreshTrigger} />
         <StockTable stocks={stocks} loading={loading} />
       </div>
     </div>

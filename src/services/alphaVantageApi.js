@@ -173,11 +173,10 @@ export const fetchMultipleQuotes = async (symbols, onProgress = null, useCache =
 
 export const fetchDailyTimeSeries = async (
   symbol,
-  days = 30,
   useCache = true
 ) => {
   // Check cache first
-  const cacheKey = CHART_CACHE_PREFIX + symbol + "_" + days;
+  const cacheKey = CHART_CACHE_PREFIX + symbol;
   if (useCache) {
     const cached = getCachedData(cacheKey);
     if (cached) {
@@ -227,8 +226,8 @@ export const fetchDailyTimeSeries = async (
     throw new Error(`No time series data available for ${symbol}`);
   }
 
-  // Convert to array and sort by date
-  const dates = Object.keys(timeSeries).sort().slice(-days);
+  // Convert to array and sort by date (API returns up to 100 days)
+  const dates = Object.keys(timeSeries).sort();
 
   const result = dates.map((date) => ({
     date,
