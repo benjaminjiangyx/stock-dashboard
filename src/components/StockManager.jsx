@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
-import { popularStocks, loadPopularStocks, getPopularStocks } from "../data/popularStocks";
-import { fetchQuote } from "../services/alphaVantageApi";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { popularStocks, loadPopularStocks } from "../data/popularStocks";
+import { fetchQuote, fetchDailyTimeSeries } from "../services/alphaVantageApi";
 
 const StockManager = ({
   symbols,
@@ -16,12 +16,26 @@ const StockManager = ({
   const [allStocks, setAllStocks] = useState(popularStocks);
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
+  const hasLoadedListings = useRef(false);
+  const listingsLoading = useRef(false);
 
-  // Load full listing on mount
-  useEffect(() => {
-    loadPopularStocks().then((stocks) => {
-      setAllStocks(stocks);
-    });
+  const ensureListingsLoaded = useCallback(() => {
+    if (hasLoadedListings.current || listingsLoading.current) {
+      return;
+    }
+
+    listingsLoading.current = true;
+    loadPopularStocks()
+      .then((stocks) => {
+        hasLoadedListings.current = true;
+        setAllStocks(stocks);
+      })
+      .catch((error) => {
+        console.warn("Failed to load full listings:", error);
+      })
+      .finally(() => {
+        listingsLoading.current = false;
+      });
   }, []);
 
   // Close dropdown when clicking outside
@@ -49,6 +63,9 @@ const StockManager = ({
 
   const updateSuggestions = (value) => {
     const upperValue = value.toUpperCase();
+    if (!hasLoadedListings.current && upperValue.length > 0) {
+      ensureListingsLoaded();
+    }
     if (!upperValue) {
       setSuggestions([]);
       setShowDropdown(false);
@@ -81,12 +98,25 @@ const StockManager = ({
       return;
     }
 
-    // Validate symbol with API before adding
+    // Validate symbol with API before adding and pre-fetch chart data
     try {
-      setError("Validating symbol...");
-      await fetchQuote(symbol, false); // Don't use cache for validation
+      setError("Loading data...");
 
-      // If API call succeeds, add to watchlist
+      // Fetch quote to validate symbol (required)
+      await fetchQuote(symbol, false);
+
+      // Small delay to avoid hitting rate limits (5 requests per minute)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Try to fetch chart data, but don't fail if it errors due to API limits
+      try {
+        await fetchDailyTimeSeries(symbol, false);
+      } catch (chartErr) {
+        console.warn(`Could not pre-fetch chart data for ${symbol}:`, chartErr.message);
+        // Continue anyway - chart will load from cache or show error later
+      }
+
+      // If quote fetch succeeded, add to watchlist
       const newSymbols = [...symbols, symbol];
       onSymbolsChange(newSymbols);
       onSymbolSelect(symbol); // Automatically switch to the new symbol
@@ -157,6 +187,7 @@ const StockManager = ({
             type="text"
             value={inputValue}
             onChange={handleInputChange}
+            onFocus={ensureListingsLoaded}
             onKeyDown={handleKeyDown}
             placeholder="Enter symbol (e.g., TSLA)"
             className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

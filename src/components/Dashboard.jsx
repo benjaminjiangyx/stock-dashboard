@@ -57,23 +57,14 @@ const Dashboard = () => {
   }, [selectedSymbol]);
 
   const handleRefresh = () => {
-    console.log('Refresh clicked - clearing all caches');
+    console.log('Refresh clicked - clearing cache for selected chart');
 
-    // Clear all chart and quote caches from localStorage
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith('stock_chart_') || key.startsWith('stock_quote_'))) {
-        keysToRemove.push(key);
-      }
-    }
+    // Only clear the cache for the currently selected symbol's chart
+    const chartCacheKey = `stock_chart_${selectedSymbol}`;
+    localStorage.removeItem(chartCacheKey);
+    console.log(`Removed cache for: ${chartCacheKey}`);
 
-    console.log(`Removing ${keysToRemove.length} cached items:`, keysToRemove);
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-
-    // Refetch all data bypassing cache
-    console.log('Triggering refetch with useCache=false');
-    refetch(false);
+    // Trigger chart refresh without affecting the stock table
     setLastUpdated(new Date());
     setChartRefreshTrigger(prev => prev + 1);
   };
@@ -91,8 +82,6 @@ const Dashboard = () => {
     progress.total > 0
       ? Math.round((progress.loaded / progress.total) * 100)
       : 0;
-
-  const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
 
   return (
     <div className="min-h-screen w-full bg-gray-900 flex flex-col">
@@ -147,9 +136,6 @@ const Dashboard = () => {
                     Refresh the page to load cached data (valid for 24 hours)
                   </li>
                   <li>Cached data loads instantly without using API calls</li>
-                  <li>
-                    Enable DEMO_MODE in .env.local to use mock data for testing
-                  </li>
                 </ul>
               </div>
             )}

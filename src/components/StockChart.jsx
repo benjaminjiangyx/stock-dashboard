@@ -40,8 +40,12 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
         const isRefresh = refreshTrigger !== previousRefreshTrigger.current;
         previousRefreshTrigger.current = refreshTrigger;
 
+        console.log(`[StockChart] Loading chart for ${symbol}, isRefresh: ${isRefresh}, useCache: ${!isRefresh}`);
+
         // Bypass cache on refresh, use cache on symbol change
         const timeSeries = await fetchDailyTimeSeries(symbol, !isRefresh);
+
+        console.log(`[StockChart] Successfully loaded chart data for ${symbol}, ${timeSeries.length} data points`);
 
         if (!isMounted || !chartContainerRef.current) {
           return;
@@ -203,7 +207,7 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
           }
         }, 100);
       } catch (err) {
-        console.error('Chart loading error:', err);
+        console.error(`[StockChart] Chart loading error for ${symbol}:`, err);
         setError(err.message);
         setLoading(false);
       }

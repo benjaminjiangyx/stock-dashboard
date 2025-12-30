@@ -1,5 +1,21 @@
 const API_BASE_URL = "https://www.alphavantage.co/query";
-const API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
+const API_KEY = (import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || "").trim();
+const PLACEHOLDER_KEYS = new Set(["", "DISABLED", "YOUR_API_KEY", "CHANGEME"]);
+
+const ensureApiKeyConfigured = () => {
+  if (!API_KEY || PLACEHOLDER_KEYS.has(API_KEY.toUpperCase())) {
+    throw new Error(
+      "Alpha Vantage API key is missing. Set VITE_ALPHA_VANTAGE_API_KEY in your .env file."
+    );
+  }
+};
+
+const parseInformationMessage = (info) => {
+  if (!info) return null;
+  const trimmed = info.trim();
+  if (!trimmed) return null;
+  return trimmed;
+};
 
 // Cache configuration
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -45,6 +61,8 @@ export const fetchQuote = async (symbol, useCache = true) => {
     console.log(`Bypassing cache for ${symbol} - fetching fresh data`);
   }
 
+  ensureApiKeyConfigured();
+
   const response = await fetch(
     `${API_BASE_URL}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
   );
@@ -55,21 +73,14 @@ export const fetchQuote = async (symbol, useCache = true) => {
 
   const data = await response.json();
 
-  // CRITICAL: Check for "Information" field (daily limit exhausted)
-  if (data["Information"]) {
-    throw new Error(
-      "Alpha Vantage daily API limit (25 requests) exhausted. " +
-        "Your free tier limit will reset in 24 hours. " +
-        "Cached data may still be available - try refreshing the page."
-    );
+  const infoMessage = parseInformationMessage(data["Information"]);
+  if (infoMessage) {
+    throw new Error(infoMessage);
   }
 
-  // Check for per-minute rate limiting
-  if (data["Note"]) {
-    throw new Error(
-      "API call frequency limit reached (5 per minute maximum). " +
-        "Please wait 60 seconds and try again."
-    );
+  const noteMessage = parseInformationMessage(data["Note"]);
+  if (noteMessage) {
+    throw new Error(noteMessage);
   }
 
   // Check for API errors (invalid symbol, etc.)
@@ -180,12 +191,16 @@ export const fetchDailyTimeSeries = async (
   if (useCache) {
     const cached = getCachedData(cacheKey);
     if (cached) {
-      console.log(`Cache hit for chart ${symbol}`);
+      console.log(`[API] Cache hit for chart ${symbol}`);
       return cached;
+    } else {
+      console.log(`[API] Cache miss for chart ${symbol}, will fetch from API`);
     }
   } else {
-    console.log(`Bypassing cache for chart ${symbol} - fetching fresh data`);
+    console.log(`[API] Bypassing cache for chart ${symbol} - fetching fresh data`);
   }
+
+  ensureApiKeyConfigured();
 
   const response = await fetch(
     `${API_BASE_URL}?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
@@ -199,21 +214,14 @@ export const fetchDailyTimeSeries = async (
 
   const data = await response.json();
 
-  // CRITICAL: Check for "Information" field (daily limit exhausted)
-  if (data["Information"]) {
-    throw new Error(
-      "Alpha Vantage daily API limit (25 requests) exhausted. " +
-        "Your free tier limit will reset in 24 hours. " +
-        "Cached data may still be available - try refreshing the page."
-    );
+  const infoMessage = parseInformationMessage(data["Information"]);
+  if (infoMessage) {
+    throw new Error(infoMessage);
   }
 
-  // Check for per-minute rate limiting
-  if (data["Note"]) {
-    throw new Error(
-      "API call frequency limit reached (5 per minute maximum). " +
-        "Please wait 60 seconds and try again."
-    );
+  const noteMessage = parseInformationMessage(data["Note"]);
+  if (noteMessage) {
+    throw new Error(noteMessage);
   }
 
   // Check for API errors (invalid symbol, etc.)
@@ -240,6 +248,7 @@ export const fetchDailyTimeSeries = async (
   }));
 
   // Cache the result
+  console.log(`[API] Caching chart data for ${symbol}`);
   setCachedData(cacheKey, result);
 
   return result;
@@ -261,6 +270,8 @@ export const fetchListingStatus = async () => {
       console.warn('Cache read error for listing status:', error);
     }
   }
+
+  ensureApiKeyConfigured();
 
   console.log('Fetching listing status from API...');
   const response = await fetch(
