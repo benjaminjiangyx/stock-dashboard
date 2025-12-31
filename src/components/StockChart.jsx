@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
-import { fetchDailyTimeSeries } from '../services/alphaVantageApi';
+import { fetchDailyTimeSeries, fetchWeeklyTimeSeries } from '../services/alphaVantageApi';
+
+const TIME_RANGE_KEY = 'chart_time_range';
 
 const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
   const chartContainerRef = useRef(null);
@@ -10,6 +12,22 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
   const [error, setError] = useState(null);
   const [latestData, setLatestData] = useState(null);
   const previousRefreshTrigger = useRef(refreshTrigger);
+
+  // Load time range from localStorage or default to 'daily'
+  const [timeRange, setTimeRange] = useState(() => {
+    try {
+      const saved = localStorage.getItem(TIME_RANGE_KEY);
+      return saved === 'weekly' ? 'weekly' : 'daily';
+    } catch (error) {
+      console.warn('Error loading time range:', error);
+      return 'daily';
+    }
+  });
+
+  // Persist time range to localStorage
+  useEffect(() => {
+    localStorage.setItem(TIME_RANGE_KEY, timeRange);
+  }, [timeRange]);
 
   useEffect(() => {
     let isMounted = true;
@@ -40,19 +58,29 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
         const isRefresh = refreshTrigger !== previousRefreshTrigger.current;
         previousRefreshTrigger.current = refreshTrigger;
 
-        console.log(`[StockChart] Loading chart for ${symbol}, isRefresh: ${isRefresh}, useCache: ${!isRefresh}`);
+        console.log(`[StockChart] Loading chart for ${symbol}, timeRange: ${timeRange}, isRefresh: ${isRefresh}, useCache: ${!isRefresh}`);
 
         // Bypass cache on refresh, use cache on symbol change
-        const timeSeries = await fetchDailyTimeSeries(symbol, !isRefresh);
+        // Conditionally fetch daily or weekly data based on timeRange
+        const timeSeries = timeRange === 'weekly'
+          ? await fetchWeeklyTimeSeries(symbol, !isRefresh)
+          : await fetchDailyTimeSeries(symbol, !isRefresh);
 
-        console.log(`[StockChart] Successfully loaded chart data for ${symbol}, ${timeSeries.length} data points`);
+        console.log(`[StockChart] Successfully loaded ${timeRange} chart data for ${symbol}, ${timeSeries.length} data points`);
 
-        if (!isMounted || !chartContainerRef.current) {
+        if (!isMounted) {
+          console.log(`[StockChart] Component unmounted, skipping chart creation for ${symbol}`);
+          return;
+        }
+
+        if (!chartContainerRef.current) {
+          console.error(`[StockChart] Chart container ref is null for ${symbol}`);
           return;
         }
 
         // Create chart
         const containerWidth = chartContainerRef.current.clientWidth || chartContainerRef.current.offsetWidth || 800;
+        console.log(`[StockChart] Creating chart for ${symbol}, container width: ${containerWidth}`);
 
         chart = createChart(chartContainerRef.current, {
           layout: {
@@ -136,6 +164,8 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
 
         // Fit all data to the visible range
         chart.timeScale().fitContent();
+
+        console.log(`[StockChart] Chart fully rendered for ${symbol}`);
 
         // Subscribe to crosshair move to update OHLCV on hover
         chart.subscribeCrosshairMove((param) => {
@@ -225,13 +255,37 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
       isMounted = false;
       cleanup();
     };
-  }, [symbol, refreshTrigger]);
+  }, [symbol, refreshTrigger, timeRange]);
 
   return (
     <div className="w-full bg-gray-800 rounded-lg p-6">
       <h2 className="text-2xl font-bold text-white mb-4">
         {symbol}
       </h2>
+
+      {/* Time Range Toggle */}
+      <div className="flex items-center gap-2 mb-3">
+        <button
+          onClick={() => setTimeRange('daily')}
+          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+            timeRange === 'daily'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          Daily (100 days)
+        </button>
+        <button
+          onClick={() => setTimeRange('weekly')}
+          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+            timeRange === 'weekly'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          Weekly (20+ years)
+        </button>
+      </div>
 
       {latestData && !loading && !error && (
         <div className="bg-gray-700 rounded-lg p-3 mb-4 grid grid-cols-5 gap-4 text-sm">

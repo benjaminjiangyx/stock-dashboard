@@ -57,16 +57,29 @@ const Dashboard = () => {
   }, [selectedSymbol]);
 
   const handleRefresh = () => {
-    console.log('Refresh clicked - clearing cache for selected chart');
+    console.log('Refresh clicked - clearing all caches and refetching data');
 
-    // Only clear the cache for the currently selected symbol's chart
-    const chartCacheKey = `stock_chart_${selectedSymbol}`;
-    localStorage.removeItem(chartCacheKey);
-    console.log(`Removed cache for: ${chartCacheKey}`);
+    // Clear cache for ALL stock quotes (table data)
+    symbols.forEach(symbol => {
+      const quoteCacheKey = `stock_quote_${symbol}`;
+      localStorage.removeItem(quoteCacheKey);
+      console.log(`Removed quote cache for: ${quoteCacheKey}`);
+    });
 
-    // Trigger chart refresh without affecting the stock table
+    // Clear cache for ALL chart data (both daily AND weekly)
+    symbols.forEach(symbol => {
+      const dailyChartCacheKey = `stock_chart_${symbol}`;
+      const weeklyChartCacheKey = `stock_chart_weekly_${symbol}`;
+      localStorage.removeItem(dailyChartCacheKey);
+      localStorage.removeItem(weeklyChartCacheKey);
+      console.log(`Removed daily chart cache for: ${dailyChartCacheKey}`);
+      console.log(`Removed weekly chart cache for: ${weeklyChartCacheKey}`);
+    });
+
+    // Trigger refetch of stock table data and chart
     setLastUpdated(new Date());
     setChartRefreshTrigger(prev => prev + 1);
+    refetch(false); // false = bypass cache
   };
 
   const handleSymbolsChange = (newSymbols) => {
@@ -153,8 +166,14 @@ const Dashboard = () => {
           selectedSymbol={selectedSymbol}
           onSymbolSelect={handleSymbolSelect}
         />
-        <StockChart symbol={selectedSymbol} refreshTrigger={chartRefreshTrigger} />
-        <StockTable stocks={stocks} loading={loading} />
+        <div className="flex gap-6">
+          <div className="w-1/4 min-w-[300px] flex-shrink-0">
+            <StockTable stocks={stocks} loading={loading} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <StockChart symbol={selectedSymbol} refreshTrigger={chartRefreshTrigger} />
+          </div>
+        </div>
       </div>
     </div>
   );

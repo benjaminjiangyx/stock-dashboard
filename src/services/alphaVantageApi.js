@@ -1,3 +1,5 @@
+import { getCacheDuration } from '../utils/marketHours';
+
 const API_BASE_URL = "https://www.alphavantage.co/query";
 const API_KEY = (import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || "").trim();
 const PLACEHOLDER_KEYS = new Set(["", "DISABLED", "YOUR_API_KEY", "CHANGEME"]);
@@ -18,20 +20,33 @@ const parseInformationMessage = (info) => {
 };
 
 // Cache configuration
-const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 const CACHE_KEY_PREFIX = "stock_quote_";
 const CHART_CACHE_PREFIX = "stock_chart_";
 const LISTING_CACHE_KEY = "stock_listing_status";
 const LISTING_CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Cache utilities
-const getCachedData = (key) => {
+const getCachedData = (key, cacheType = 'quote') => {
   try {
     const cached = localStorage.getItem(key);
-    if (!cached) return null;
+    if (!cached) {
+      console.log(`No cache found for ${key} (${cacheType})`);
+      return null;
+    }
 
     const { data, timestamp } = JSON.parse(cached);
-    const isValid = Date.now() - timestamp < CACHE_DURATION;
+
+    // Calculate dynamic cache duration based on type and market status
+    const cacheDuration = getCacheDuration(cacheType, timestamp);
+    const age = Date.now() - timestamp;
+    const isValid = age < cacheDuration;
+
+    // Debug logging
+    if (isValid) {
+      console.log(`Cache hit for ${key} (${cacheType}): age=${Math.floor(age/1000)}s, max=${Math.floor(cacheDuration/1000)}s`);
+    } else {
+      console.log(`Cache expired for ${key} (${cacheType}): age=${Math.floor(age/1000)}s, max=${Math.floor(cacheDuration/1000)}s`);
+    }
 
     return isValid ? data : null;
   } catch (error) {
@@ -52,9 +67,8 @@ export const fetchQuote = async (symbol, useCache = true) => {
   // Check cache first
   const cacheKey = CACHE_KEY_PREFIX + symbol;
   if (useCache) {
-    const cached = getCachedData(cacheKey);
+    const cached = getCachedData(cacheKey, 'quote');
     if (cached) {
-      console.log(`Cache hit for ${symbol}`);
       return cached;
     }
   } else {
@@ -189,7 +203,7 @@ export const fetchDailyTimeSeries = async (
   // Check cache first
   const cacheKey = CHART_CACHE_PREFIX + symbol;
   if (useCache) {
-    const cached = getCachedData(cacheKey);
+    const cached = getCachedData(cacheKey, 'chart');
     if (cached) {
       console.log(`[API] Cache hit for chart ${symbol}`);
       return cached;
@@ -249,6 +263,78 @@ export const fetchDailyTimeSeries = async (
 
   // Cache the result
   console.log(`[API] Caching chart data for ${symbol}`);
+  setCachedData(cacheKey, result);
+
+  return result;
+};
+
+export const fetchWeeklyTimeSeries = async (
+  symbol,
+  useCache = true
+) => {
+  // Check cache first
+  const cacheKey = CHART_CACHE_PREFIX + 'weekly_' + symbol;
+  if (useCache) {
+    const cached = getCachedData(cacheKey, 'chart_weekly');
+    if (cached) {
+      console.log(`[API] Cache hit for weekly chart ${symbol}`);
+      return cached;
+    } else {
+      console.log(`[API] Cache miss for weekly chart ${symbol}, will fetch from API`);
+    }
+  } else {
+    console.log(`[API] Bypassing cache for weekly chart ${symbol} - fetching fresh data`);
+  }
+
+  ensureApiKeyConfigured();
+
+  const response = await fetch(
+    `${API_BASE_URL}?function=TIME_SERIES_WEEKLY_ADJUSTED&symbol=${symbol}&apikey=${API_KEY}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch weekly time series for ${symbol}: ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+
+  const infoMessage = parseInformationMessage(data["Information"]);
+  if (infoMessage) {
+    throw new Error(infoMessage);
+  }
+
+  const noteMessage = parseInformationMessage(data["Note"]);
+  if (noteMessage) {
+    throw new Error(noteMessage);
+  }
+
+  // Check for API errors (invalid symbol, etc.)
+  if (data["Error Message"]) {
+    throw new Error(data["Error Message"]);
+  }
+
+  const timeSeries = data["Weekly Adjusted Time Series"];
+  if (!timeSeries) {
+    throw new Error(`No weekly time series data available for ${symbol}`);
+  }
+
+  // Convert to array and sort by date (API returns 20+ years of data)
+  const dates = Object.keys(timeSeries).sort();
+
+  const result = dates.map((date) => ({
+    date,
+    timestamp: new Date(date).getTime() / 1000,
+    open: parseFloat(timeSeries[date]["1. open"]),
+    high: parseFloat(timeSeries[date]["2. high"]),
+    low: parseFloat(timeSeries[date]["3. low"]),
+    close: parseFloat(timeSeries[date]["5. adjusted close"]),
+    volume: parseInt(timeSeries[date]["6. volume"]),
+  }));
+
+  // Cache the result
+  console.log(`[API] Caching weekly chart data for ${symbol}`);
   setCachedData(cacheKey, result);
 
   return result;
