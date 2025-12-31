@@ -16,7 +16,9 @@ const parseInformationMessage = (info) => {
   if (!info) return null;
   const trimmed = info.trim();
   if (!trimmed) return null;
-  return trimmed;
+
+  // Sanitize API key from error messages
+  return trimmed.replace(/[A-Z0-9]{16,}/g, '[API_KEY]');
 };
 
 // Cache configuration
@@ -24,6 +26,21 @@ const CACHE_KEY_PREFIX = "stock_quote_";
 const CHART_CACHE_PREFIX = "stock_chart_";
 const LISTING_CACHE_KEY = "stock_listing_status";
 const LISTING_CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+// Rate limiting: 1 request per second
+let lastApiCallTime = 0;
+const MIN_API_CALL_INTERVAL = 1200; // 1.2 seconds to be safe
+
+const waitForRateLimit = async () => {
+  const now = Date.now();
+  const timeSinceLastCall = now - lastApiCallTime;
+  if (timeSinceLastCall < MIN_API_CALL_INTERVAL) {
+    const waitTime = MIN_API_CALL_INTERVAL - timeSinceLastCall;
+    console.log(`[API] Rate limit: waiting ${waitTime}ms before next request`);
+    await new Promise((resolve) => setTimeout(resolve, waitTime));
+  }
+  lastApiCallTime = Date.now();
+};
 
 // Cache utilities
 const getCachedData = (key, cacheType = "quote") => {
@@ -85,6 +102,9 @@ export const fetchQuote = async (symbol, useCache = true) => {
 
   ensureApiKeyConfigured();
 
+  // Wait for rate limit before making API call
+  await waitForRateLimit();
+
   const response = await fetch(
     `${API_BASE_URL}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
   );
@@ -139,29 +159,10 @@ export const fetchMultipleQuotes = async (
 ) => {
   const quotes = [];
   const errors = [];
-  const DELAY_BETWEEN_REQUESTS = 1000; // 1 second
 
-  // Fetch symbols one at a time with proper delays
+  // Fetch symbols one at a time (rate limiting handled automatically by fetchQuote)
   for (let i = 0; i < symbols.length; i++) {
     const symbol = symbols[i];
-
-    // Add delay before each request (except the first one)
-    if (i > 0) {
-      if (onProgress) {
-        onProgress({
-          status: "waiting",
-          message: `Waiting for API rate limit (${Math.ceil(
-            DELAY_BETWEEN_REQUESTS / 1000
-          )}s)...`,
-          loaded: i,
-          total: symbols.length,
-          currentSymbol: "",
-        });
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, DELAY_BETWEEN_REQUESTS)
-      );
-    }
 
     if (onProgress) {
       onProgress({
@@ -220,6 +221,9 @@ export const fetchDailyTimeSeries = async (symbol, useCache = true) => {
   }
 
   ensureApiKeyConfigured();
+
+  // Wait for rate limit before making API call
+  await waitForRateLimit();
 
   const response = await fetch(
     `${API_BASE_URL}?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
@@ -293,6 +297,9 @@ export const fetchWeeklyTimeSeries = async (symbol, useCache = true) => {
   }
 
   ensureApiKeyConfigured();
+
+  // Wait for rate limit before making API call
+  await waitForRateLimit();
 
   const response = await fetch(
     `${API_BASE_URL}?function=TIME_SERIES_WEEKLY_ADJUSTED&symbol=${symbol}&apikey=${API_KEY}`
@@ -379,6 +386,9 @@ export const fetchMonthlyTimeSeries = async (symbol, useCache = true) => {
 
   ensureApiKeyConfigured();
 
+  // Wait for rate limit before making API call
+  await waitForRateLimit();
+
   const response = await fetch(
     `${API_BASE_URL}?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${symbol}&apikey=${API_KEY}`
   );
@@ -462,6 +472,9 @@ export const fetchListingStatus = async () => {
   }
 
   ensureApiKeyConfigured();
+
+  // Wait for rate limit before making API call
+  await waitForRateLimit();
 
   console.log("Fetching listing status from API...");
   const response = await fetch(

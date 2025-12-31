@@ -106,20 +106,21 @@ const StockManager = ({
       // Fetch quote to validate symbol (required)
       await fetchQuote(symbol, false);
 
-      // Small delay to avoid hitting rate limits (5 requests per minute)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       // Try to fetch chart data, but don't fail if it errors due to API limits
+      // Rate limiting is now handled automatically in the API service
       try {
+        console.log(`[StockManager] Pre-fetching chart data for ${symbol}...`);
         await fetchDailyTimeSeries(symbol, false);
+        console.log(`[StockManager] Successfully pre-fetched chart data for ${symbol}`);
       } catch (chartErr) {
         console.warn(
-          `Could not pre-fetch chart data for ${symbol}:`,
+          `[StockManager] Could not pre-fetch chart data for ${symbol}:`,
           chartErr.message
         );
         // Continue anyway - chart will load from cache or show error later
       }
 
+      console.log(`[StockManager] Adding ${symbol} to watchlist and selecting it`);
       // If quote fetch succeeded, add to watchlist
       const newSymbols = [...symbols, symbol];
       onSymbolsChange(newSymbols);
@@ -128,7 +129,14 @@ const StockManager = ({
       setError("");
       setShowDropdown(false);
     } catch (err) {
-      setError(`Invalid symbol: ${err.message}`);
+      const errorMsg = err.message || String(err);
+      if (errorMsg.includes("25 requests per day")) {
+        setError("Daily API limit reached. Please try again later or use cached data.");
+      } else if (errorMsg.includes("per second")) {
+        setError("Too many requests. Please wait a moment and try again.");
+      } else {
+        setError(`Invalid symbol: ${errorMsg}`);
+      }
     }
   };
 

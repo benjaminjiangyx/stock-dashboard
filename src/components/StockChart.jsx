@@ -20,6 +20,7 @@ const StockChart = ({ symbol = "AAPL", refreshTrigger = 0 }) => {
   const [error, setError] = useState(null);
   const [latestData, setLatestData] = useState(null);
   const previousRefreshTrigger = useRef(refreshTrigger);
+  const previousSymbol = useRef(symbol);
 
   // Load time range from localStorage or default to 'daily'
   const [timeRange, setTimeRange] = useState(() => {
@@ -62,22 +63,27 @@ const StockChart = ({ symbol = "AAPL", refreshTrigger = 0 }) => {
         setLoading(true);
         setError(null);
 
-        // Check if this is a refresh (refreshTrigger changed) or a symbol change
+        // Check if this is a refresh (refreshTrigger changed)
         const isRefresh = refreshTrigger !== previousRefreshTrigger.current;
         previousRefreshTrigger.current = refreshTrigger;
+        previousSymbol.current = symbol;
+
+        // Bypass cache on refresh, use cache otherwise (including symbol changes)
+        // Symbol changes should use cache because StockManager pre-fetches the data
+        const useCache = !isRefresh;
 
         console.log(
-          `[StockChart] Loading chart for ${symbol}, timeRange: ${timeRange}, isRefresh: ${isRefresh}, useCache: ${!isRefresh}`
+          `[StockChart] Loading chart for ${symbol}, timeRange: ${timeRange}, isRefresh: ${isRefresh}, useCache: ${useCache}`
         );
 
-        // Bypass cache on refresh, use cache on symbol change
+        // Bypass cache only on refresh, not on symbol change
         // Conditionally fetch daily, weekly, or monthly data based on timeRange
         const timeSeries =
           timeRange === "monthly"
-            ? await fetchMonthlyTimeSeries(symbol, !isRefresh)
+            ? await fetchMonthlyTimeSeries(symbol, useCache)
             : timeRange === "weekly"
-            ? await fetchWeeklyTimeSeries(symbol, !isRefresh)
-            : await fetchDailyTimeSeries(symbol, !isRefresh);
+            ? await fetchWeeklyTimeSeries(symbol, useCache)
+            : await fetchDailyTimeSeries(symbol, useCache);
 
         console.log(
           `[StockChart] Successfully loaded ${timeRange} chart data for ${symbol}, ${timeSeries.length} data points`
@@ -422,9 +428,11 @@ const StockChart = ({ symbol = "AAPL", refreshTrigger = 0 }) => {
           <div className="text-lg font-semibold mb-2">
             Chart Data Unavailable
           </div>
-          <div className="text-sm text-gray-500">
-            {error.includes("API limit") || error.includes("daily limit")
-              ? "Chart data will be available when API limit resets or from cache"
+          <div className="text-sm text-gray-500 text-center max-w-md px-4">
+            {error.includes("25 requests per day") || error.includes("daily limit")
+              ? "Daily API limit reached (25 requests/day). Data will be available from cache or after limit resets."
+              : error.includes("per second") || error.includes("API limit")
+              ? "Rate limit exceeded. Please wait a moment and try refreshing."
               : "Unable to load chart data at this time"}
           </div>
         </div>
