@@ -429,7 +429,9 @@ const StockChart = ({ symbol = "AAPL", refreshTrigger = 0 }) => {
             Chart Data Unavailable
           </div>
           <div className="text-sm text-gray-500 text-center max-w-md px-4">
-            {error.includes("25 requests per day") || error.includes("daily limit")
+            {error.includes("API key is missing") || error.includes("Please enter your API key")
+              ? "API key required. Click the settings icon (⚙️) at the top right to add your key."
+              : error.includes("25 requests per day") || error.includes("daily limit")
               ? "Daily API limit reached (25 requests/day). Data will be available from cache or after limit resets."
               : error.includes("per second") || error.includes("API limit")
               ? "Rate limit exceeded. Please wait a moment and try refreshing."

@@ -1,13 +1,51 @@
 import { getCacheDuration } from "../utils/marketHours";
 
 const API_BASE_URL = "https://www.alphavantage.co/query";
-const API_KEY = (import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || "").trim();
 const PLACEHOLDER_KEYS = new Set(["", "DISABLED", "YOUR_API_KEY", "CHANGEME"]);
+const USER_API_KEY_STORAGE = "alpha_vantage_user_api_key";
+
+// Get API key from user's localStorage (no fallback - BYOK required)
+const getApiKey = () => {
+  try {
+    const userKey = localStorage.getItem(USER_API_KEY_STORAGE);
+    if (userKey && userKey.trim()) {
+      return userKey.trim();
+    }
+  } catch (error) {
+    console.warn("Error reading user API key:", error);
+  }
+  return "";
+};
+
+// Set user's API key
+export const setUserApiKey = (key) => {
+  try {
+    if (key && key.trim()) {
+      localStorage.setItem(USER_API_KEY_STORAGE, key.trim());
+    } else {
+      localStorage.removeItem(USER_API_KEY_STORAGE);
+    }
+  } catch (error) {
+    console.warn("Error saving user API key:", error);
+    throw new Error("Failed to save API key");
+  }
+};
+
+// Get user's API key (for display purposes)
+export const getUserApiKey = () => {
+  try {
+    return localStorage.getItem(USER_API_KEY_STORAGE) || "";
+  } catch (error) {
+    console.warn("Error reading user API key:", error);
+    return "";
+  }
+};
 
 const ensureApiKeyConfigured = () => {
-  if (!API_KEY || PLACEHOLDER_KEYS.has(API_KEY.toUpperCase())) {
+  const apiKey = getApiKey();
+  if (!apiKey || PLACEHOLDER_KEYS.has(apiKey.toUpperCase())) {
     throw new Error(
-      "Alpha Vantage API key is missing. Set VITE_ALPHA_VANTAGE_API_KEY in your .env file."
+      "Alpha Vantage API key is missing. Please enter your API key in settings."
     );
   }
 };
@@ -105,8 +143,9 @@ export const fetchQuote = async (symbol, useCache = true) => {
   // Wait for rate limit before making API call
   await waitForRateLimit();
 
+  const apiKey = getApiKey();
   const response = await fetch(
-    `${API_BASE_URL}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
+    `${API_BASE_URL}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`
   );
 
   if (!response.ok) {
@@ -225,8 +264,9 @@ export const fetchDailyTimeSeries = async (symbol, useCache = true) => {
   // Wait for rate limit before making API call
   await waitForRateLimit();
 
+  const apiKey = getApiKey();
   const response = await fetch(
-    `${API_BASE_URL}?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
+    `${API_BASE_URL}?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`
   );
 
   if (!response.ok) {
@@ -301,8 +341,9 @@ export const fetchWeeklyTimeSeries = async (symbol, useCache = true) => {
   // Wait for rate limit before making API call
   await waitForRateLimit();
 
+  const apiKey = getApiKey();
   const response = await fetch(
-    `${API_BASE_URL}?function=TIME_SERIES_WEEKLY_ADJUSTED&symbol=${symbol}&apikey=${API_KEY}`
+    `${API_BASE_URL}?function=TIME_SERIES_WEEKLY_ADJUSTED&symbol=${symbol}&apikey=${apiKey}`
   );
 
   if (!response.ok) {
@@ -389,8 +430,9 @@ export const fetchMonthlyTimeSeries = async (symbol, useCache = true) => {
   // Wait for rate limit before making API call
   await waitForRateLimit();
 
+  const apiKey = getApiKey();
   const response = await fetch(
-    `${API_BASE_URL}?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${symbol}&apikey=${API_KEY}`
+    `${API_BASE_URL}?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${symbol}&apikey=${apiKey}`
   );
 
   if (!response.ok) {
@@ -477,8 +519,9 @@ export const fetchListingStatus = async () => {
   await waitForRateLimit();
 
   console.log("Fetching listing status from API...");
+  const apiKey = getApiKey();
   const response = await fetch(
-    `${API_BASE_URL}?function=LISTING_STATUS&apikey=${API_KEY}`
+    `${API_BASE_URL}?function=LISTING_STATUS&apikey=${apiKey}`
   );
 
   if (!response.ok) {

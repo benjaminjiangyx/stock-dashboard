@@ -130,7 +130,9 @@ const StockManager = ({
       setShowDropdown(false);
     } catch (err) {
       const errorMsg = err.message || String(err);
-      if (errorMsg.includes("25 requests per day")) {
+      if (errorMsg.includes("API key is missing") || errorMsg.includes("Please enter your API key")) {
+        setError("API key required. Click the settings icon (⚙️) to add your key.");
+      } else if (errorMsg.includes("25 requests per day")) {
         setError("Daily API limit reached. Please try again later or use cached data.");
       } else if (errorMsg.includes("per second")) {
         setError("Too many requests. Please wait a moment and try again.");

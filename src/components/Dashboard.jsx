@@ -3,6 +3,9 @@ import { useStockData } from "../hooks/useStockData";
 import StockTable from "./StockTable";
 import StockChart from "./StockChart";
 import StockManager from "./StockManager";
+import Header from "./Header";
+import SettingsModal from "./SettingsModal";
+import { getUserApiKey } from "../services/alphaVantageApi";
 
 const DEFAULT_SYMBOLS = ["AAPL", "MSFT", "GOOGL"];
 const STORAGE_KEY = "stock_watchlist";
@@ -42,7 +45,18 @@ const Dashboard = () => {
   const [selectedSymbol, setSelectedSymbol] = useState(() =>
     loadSelectedSymbol(symbols)
   );
+  const [showSettings, setShowSettings] = useState(false);
+  const [isFirstTime, setIsFirstTime] = useState(false);
   const { stocks, loading, error, progress } = useStockData(symbols);
+
+  // Check if user has API key on mount (first-time user detection)
+  useEffect(() => {
+    const apiKey = getUserApiKey();
+    if (!apiKey) {
+      setIsFirstTime(true);
+      setShowSettings(true);
+    }
+  }, []);
 
   // Save symbols to localStorage whenever they change
   useEffect(() => {
@@ -68,9 +82,25 @@ const Dashboard = () => {
       ? Math.round((progress.loaded / progress.total) * 100)
       : 0;
 
+  const handleCloseSettings = () => {
+    setShowSettings(false);
+    setIsFirstTime(false);
+  };
+
   return (
-    <div className="min-h-screen w-full bg-black flex flex-col p-4">
-      <div>
+    <div className="min-h-screen w-full bg-black flex flex-col">
+      {/* Header */}
+      <Header onSettingsClick={() => setShowSettings(true)} />
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <SettingsModal
+          onClose={handleCloseSettings}
+          isFirstTime={isFirstTime}
+        />
+      )}
+
+      <div className="p-4">
         {loading && progress.total > 0 && (
           <div className="max-w-7xl mx-auto w-full mb-6">
             <div className="bg-zinc-900 p-4 rounded-lg">
