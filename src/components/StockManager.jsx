@@ -72,8 +72,9 @@ const StockManager = ({
       return;
     }
 
-    const filtered = allStocks
-      .filter((stock) => stock.symbol.startsWith(upperValue));
+    const filtered = allStocks.filter((stock) =>
+      stock.symbol.startsWith(upperValue)
+    );
 
     setSuggestions(filtered);
     setShowDropdown(filtered.length > 0);
@@ -106,13 +107,16 @@ const StockManager = ({
       await fetchQuote(symbol, false);
 
       // Small delay to avoid hitting rate limits (5 requests per minute)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Try to fetch chart data, but don't fail if it errors due to API limits
       try {
         await fetchDailyTimeSeries(symbol, false);
       } catch (chartErr) {
-        console.warn(`Could not pre-fetch chart data for ${symbol}:`, chartErr.message);
+        console.warn(
+          `Could not pre-fetch chart data for ${symbol}:`,
+          chartErr.message
+        );
         // Continue anyway - chart will load from cache or show error later
       }
 
@@ -177,11 +181,14 @@ const StockManager = ({
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 mb-6">
-      <h2 className="text-xl font-bold text-white mb-4"> Manage Watchlist</h2>
+    <div className="bg-zinc-900 rounded-lg p-6 mb-6">
+      <h2 className="text-xl font-bold text-white mb-4 !px-2">
+        {" "}
+        Manage Watchlist
+      </h2>
 
-      <div className="flex gap-3 relative">
-        <div className="flex-1 relative">
+      <div className="flex gap-3 relative !px-2">
+        <div className="flex-1 relative ">
           <input
             ref={inputRef}
             type="text"
@@ -190,13 +197,13 @@ const StockManager = ({
             onFocus={ensureListingsLoaded}
             onKeyDown={handleKeyDown}
             placeholder="Enter symbol (e.g., TSLA)"
-            className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-zinc-800 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             maxLength={6}
           />
           {showDropdown && suggestions.length > 0 && (
             <div
               ref={dropdownRef}
-              className="absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto"
+              className="absolute z-10 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg max-h-64 overflow-y-auto"
             >
               {suggestions.map((stock, index) => (
                 <div
@@ -204,8 +211,8 @@ const StockManager = ({
                   onClick={() => handleSuggestionClick(stock.symbol)}
                   className={`px-4 py-2 cursor-pointer transition-colors ${
                     index === selectedIndex
-                      ? "bg-blue-600 text-white"
-                      : "hover:bg-gray-600 text-gray-200"
+                      ? "bg-emerald-600 text-white"
+                      : "hover:bg-zinc-700 text-gray-200"
                   }`}
                 >
                   <div className="font-semibold">{stock.symbol}</div>
@@ -220,7 +227,7 @@ const StockManager = ({
         </button>
       </div>
 
-      {error && <div className="text-red-400 text-sm mt-2 mb-4">{error}</div>}
+      {error && <div className="text-orange-400 text-sm mt-2 mb-4">{error}</div>}
 
       <div className="flex flex-wrap gap-2" style={{ marginTop: "0.5rem" }}>
         {symbols.map((symbol) => (
@@ -228,8 +235,8 @@ const StockManager = ({
             key={symbol}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
               selectedSymbol === symbol
-                ? "bg-blue-600 text-white"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                ? "bg-emerald-600 text-white"
+                : "bg-zinc-800 text-gray-300 hover:bg-zinc-700"
             }`}
           >
             <button
@@ -240,7 +247,7 @@ const StockManager = ({
             </button>
             <button
               onClick={() => handleRemove(symbol)}
-              className="text-red-400 hover:text-red-300 ml-2"
+              className="text-orange-400 hover:text-orange-300 ml-2"
               title="Remove from watchlist"
             >
               ×

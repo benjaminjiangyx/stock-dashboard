@@ -42,9 +42,7 @@ const Dashboard = () => {
   const [selectedSymbol, setSelectedSymbol] = useState(() =>
     loadSelectedSymbol(symbols)
   );
-  const { stocks, loading, error, progress, refetch } = useStockData(symbols);
-  const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [chartRefreshTrigger, setChartRefreshTrigger] = useState(0);
+  const { stocks, loading, error, progress } = useStockData(symbols);
 
   // Save symbols to localStorage whenever they change
   useEffect(() => {
@@ -55,32 +53,6 @@ const Dashboard = () => {
   useEffect(() => {
     localStorage.setItem(SELECTED_SYMBOL_KEY, selectedSymbol);
   }, [selectedSymbol]);
-
-  const handleRefresh = () => {
-    console.log('Refresh clicked - clearing all caches and refetching data');
-
-    // Clear cache for ALL stock quotes (table data)
-    symbols.forEach(symbol => {
-      const quoteCacheKey = `stock_quote_${symbol}`;
-      localStorage.removeItem(quoteCacheKey);
-      console.log(`Removed quote cache for: ${quoteCacheKey}`);
-    });
-
-    // Clear cache for ALL chart data (both daily AND weekly)
-    symbols.forEach(symbol => {
-      const dailyChartCacheKey = `stock_chart_${symbol}`;
-      const weeklyChartCacheKey = `stock_chart_weekly_${symbol}`;
-      localStorage.removeItem(dailyChartCacheKey);
-      localStorage.removeItem(weeklyChartCacheKey);
-      console.log(`Removed daily chart cache for: ${dailyChartCacheKey}`);
-      console.log(`Removed weekly chart cache for: ${weeklyChartCacheKey}`);
-    });
-
-    // Trigger refetch of stock table data and chart
-    setLastUpdated(new Date());
-    setChartRefreshTrigger(prev => prev + 1);
-    refetch(false); // false = bypass cache
-  };
 
   const handleSymbolsChange = (newSymbols) => {
     setSymbols(newSymbols);
@@ -97,25 +69,11 @@ const Dashboard = () => {
       : 0;
 
   return (
-    <div className="min-h-screen w-full bg-gray-900 flex flex-col">
-      <div className="px-8 py-4">
-        <div className="flex justify-between items-center bg-gray-800 p-2 rounded-lg mb-6 w-full">
-          <div className="text-sm text-gray-400">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </div>
-
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="text-xs !px-3 !py-1.5 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:bg-gray-600 disabled:cursor-not-allowed"
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-
+    <div className="min-h-screen w-full bg-black flex flex-col p-4">
+      <div>
         {loading && progress.total > 0 && (
           <div className="max-w-7xl mx-auto w-full mb-6">
-            <div className="bg-gray-800 p-4 rounded-lg">
+            <div className="bg-zinc-900 p-4 rounded-lg">
               <div className="flex justify-between text-sm text-gray-400 mb-2">
                 <span>
                   {progress.status === "waiting"
@@ -126,9 +84,9 @@ const Dashboard = () => {
                 </span>
                 <span>{progressPercent}%</span>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-2.5">
+              <div className="w-full bg-zinc-800 rounded-full h-2.5">
                 <div
-                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                  className="bg-emerald-500 h-2.5 rounded-full transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -157,7 +115,7 @@ const Dashboard = () => {
       </div>
 
       <div
-        className="w-full flex-1 flex flex-col gap-6 px-8 pb-8"
+        className="w-full flex-1 flex flex-col gap-6 !px-4"
         style={{ marginTop: "0.5rem" }}
       >
         <StockManager
@@ -171,8 +129,17 @@ const Dashboard = () => {
             <StockTable stocks={stocks} loading={loading} />
           </div>
           <div className="flex-1 min-w-0">
-            <StockChart symbol={selectedSymbol} refreshTrigger={chartRefreshTrigger} />
+            <StockChart
+              symbol={selectedSymbol}
+            />
           </div>
+        </div>
+        <div className="text-xs text-gray-500 italic text-center mt-2">
+          *Disclaimer: Weekly and monthly data is adjusted, which may cause
+          abnormally-large discrepancies during stock splits.
+        </div>
+        <div className="text-xs text-gray-500 text-center mt-6 pt-4 border-t border-zinc-800">
+          © {new Date().getFullYear()} Benjamin Jiang. All rights reserved.
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ const StockTable = ({ stocks, loading }) => {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
       </div>
     );
   }
@@ -18,7 +18,7 @@ const StockTable = ({ stocks, loading }) => {
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="grid grid-cols-3 w-full bg-gray-700 border-b-2 border-gray-600">
+      <div className="grid grid-cols-3 w-full bg-zinc-800 border-b-2 border-zinc-700">
         <div className="px-6 py-4 text-xl text-center font-medium text-gray-300 uppercase tracking-wider">
           Stock Symbol
         </div>
@@ -31,13 +31,13 @@ const StockTable = ({ stocks, loading }) => {
       </div>
 
       {/* Body */}
-      <div className="w-full bg-gray-800 divide-y divide-gray-700">
+      <div className="w-full bg-zinc-900 divide-y divide-zinc-800">
         {stocks.map((stock) => {
           const isPositive = stock.change >= 0;
           return (
             <div
               key={stock.symbol}
-              className="grid grid-cols-3 w-full hover:bg-gray-700/50 transition-colors"
+              className="grid grid-cols-3 w-full hover:bg-zinc-800/70 transition-colors"
             >
               <div className="px-6 py-4 text-xl text-center font-bold text-white">
                 {stock.symbol}
@@ -47,7 +47,7 @@ const StockTable = ({ stocks, loading }) => {
               </div>
               <div
                 className={`px-6 py-4 text-xl text-center font-semibold ${
-                  isPositive ? "text-green-400" : "text-red-400"
+                  isPositive ? "text-emerald-400" : "text-orange-500"
                 }`}
               >
                 {isPositive ? "+" : ""}

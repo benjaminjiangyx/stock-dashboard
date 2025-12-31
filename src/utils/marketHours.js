@@ -170,6 +170,10 @@ export function getCacheDuration(cacheType, timestamp = Date.now()) {
       // Weekly data changes less frequently - cache for 7 days
       return 7 * 24 * 60 * 60 * 1000;
 
+    case 'chart_monthly':
+      // Monthly data changes less frequently - cache for 30 days
+      return 30 * 24 * 60 * 60 * 1000;
+
     case 'listing':
       // Listing data: cache for 30 days
       return 30 * 24 * 60 * 60 * 1000;

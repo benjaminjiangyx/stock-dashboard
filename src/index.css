@@ -55,20 +55,20 @@
 
 body {
   font-family: system-ui, -apple-system, sans-serif;
-  background-color: #111827;
+  background-color: #000000;
   color: #f9fafb;
   min-height: 100vh;
 }
 
 #root {
   min-height: 100vh;
-  background-color: #111827;
+  background-color: #000000;
 }
 
 @layer components {
   .btn-primary {
-    @apply !px-4 !py-2 bg-blue-600 text-white font-semibold rounded-lg transition-all;
-    @apply hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed;
+    @apply !px-4 !py-2 bg-emerald-600 text-white font-semibold rounded-lg transition-all;
+    @apply hover:bg-emerald-500 disabled:bg-zinc-700 disabled:cursor-not-allowed;
   }
 
   .table-cell {

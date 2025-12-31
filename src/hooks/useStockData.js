@@ -17,6 +17,7 @@ export const useStockData = (symbols) => {
     try {
       setLoading(true);
       setError(null);
+      setStocks([]); // Clear existing stocks when starting fresh
       setProgress({
         loaded: 0,
         total: symbols.length,

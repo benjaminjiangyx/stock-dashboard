@@ -1,4 +1,4 @@
-import { getCacheDuration } from '../utils/marketHours';
+import { getCacheDuration } from "../utils/marketHours";
 
 const API_BASE_URL = "https://www.alphavantage.co/query";
 const API_KEY = (import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || "").trim();
@@ -26,7 +26,7 @@ const LISTING_CACHE_KEY = "stock_listing_status";
 const LISTING_CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Cache utilities
-const getCachedData = (key, cacheType = 'quote') => {
+const getCachedData = (key, cacheType = "quote") => {
   try {
     const cached = localStorage.getItem(key);
     if (!cached) {
@@ -43,9 +43,17 @@ const getCachedData = (key, cacheType = 'quote') => {
 
     // Debug logging
     if (isValid) {
-      console.log(`Cache hit for ${key} (${cacheType}): age=${Math.floor(age/1000)}s, max=${Math.floor(cacheDuration/1000)}s`);
+      console.log(
+        `Cache hit for ${key} (${cacheType}): age=${Math.floor(
+          age / 1000
+        )}s, max=${Math.floor(cacheDuration / 1000)}s`
+      );
     } else {
-      console.log(`Cache expired for ${key} (${cacheType}): age=${Math.floor(age/1000)}s, max=${Math.floor(cacheDuration/1000)}s`);
+      console.log(
+        `Cache expired for ${key} (${cacheType}): age=${Math.floor(
+          age / 1000
+        )}s, max=${Math.floor(cacheDuration / 1000)}s`
+      );
     }
 
     return isValid ? data : null;
@@ -67,7 +75,7 @@ export const fetchQuote = async (symbol, useCache = true) => {
   // Check cache first
   const cacheKey = CACHE_KEY_PREFIX + symbol;
   if (useCache) {
-    const cached = getCachedData(cacheKey, 'quote');
+    const cached = getCachedData(cacheKey, "quote");
     if (cached) {
       return cached;
     }
@@ -124,66 +132,64 @@ export const fetchQuote = async (symbol, useCache = true) => {
   return result;
 };
 
-export const fetchMultipleQuotes = async (symbols, onProgress = null, useCache = true) => {
+export const fetchMultipleQuotes = async (
+  symbols,
+  onProgress = null,
+  useCache = true
+) => {
   const quotes = [];
   const errors = [];
-  const BATCH_SIZE = 5;
-  const WAIT_BETWEEN_BATCHES = 61000; // 61 seconds
+  const DELAY_BETWEEN_REQUESTS = 1000; // 1 second
 
-  // Process in batches of 5 to respect rate limits (5 per minute)
-  for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
-    const batch = symbols.slice(i, i + BATCH_SIZE);
+  // Fetch symbols one at a time with proper delays
+  for (let i = 0; i < symbols.length; i++) {
+    const symbol = symbols[i];
 
-    // If not the first batch, wait before proceeding
+    // Add delay before each request (except the first one)
     if (i > 0) {
       if (onProgress) {
         onProgress({
           status: "waiting",
-          message: `Waiting 60s for API rate limit...`,
+          message: `Waiting for API rate limit (${Math.ceil(
+            DELAY_BETWEEN_REQUESTS / 1000
+          )}s)...`,
           loaded: i,
           total: symbols.length,
           currentSymbol: "",
         });
       }
       await new Promise((resolve) =>
-        setTimeout(resolve, WAIT_BETWEEN_BATCHES)
+        setTimeout(resolve, DELAY_BETWEEN_REQUESTS)
       );
     }
 
-    // Fetch batch with minimal delays (500ms between each request)
-    for (let j = 0; j < batch.length; j++) {
-      const symbol = batch[j];
-      const overallIndex = i + j;
+    if (onProgress) {
+      onProgress({
+        status: "loading",
+        currentSymbol: symbol,
+        loaded: i,
+        total: symbols.length,
+        message: `Loading ${symbol}...`,
+      });
+    }
 
-      if (onProgress) {
-        onProgress({
-          status: "loading",
-          currentSymbol: symbol,
-          loaded: overallIndex,
-          total: symbols.length,
-          message: `Loading ${symbol}...`,
-        });
-      }
-
-      try {
-        const quote = await fetchQuote(symbol, useCache);
-        quotes.push(quote);
-      } catch (error) {
-        console.warn(`Failed to fetch ${symbol}:`, error.message);
-        errors.push({ symbol, error: error.message });
-      }
-
-      // Small delay between requests within batch (safety buffer)
-      if (j < batch.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
+    try {
+      const quote = await fetchQuote(symbol, useCache);
+      quotes.push(quote);
+    } catch (error) {
+      console.warn(`Failed to fetch ${symbol}:`, error.message);
+      errors.push({ symbol, error: error.message });
     }
   }
 
   // If we got some quotes, return them even if some failed
   if (quotes.length > 0) {
     if (errors.length > 0) {
-      console.warn(`Successfully loaded ${quotes.length}/${symbols.length} stocks from cache`);
+      console.warn(
+        `Successfully loaded ${quotes.length}/${
+          symbols.length
+        } stocks. Failed: ${errors.map((e) => e.symbol).join(", ")}`
+      );
     }
     return quotes;
   }
@@ -196,14 +202,11 @@ export const fetchMultipleQuotes = async (symbols, onProgress = null, useCache =
   return quotes;
 };
 
-export const fetchDailyTimeSeries = async (
-  symbol,
-  useCache = true
-) => {
+export const fetchDailyTimeSeries = async (symbol, useCache = true) => {
   // Check cache first
   const cacheKey = CHART_CACHE_PREFIX + symbol;
   if (useCache) {
-    const cached = getCachedData(cacheKey, 'chart');
+    const cached = getCachedData(cacheKey, "chart");
     if (cached) {
       console.log(`[API] Cache hit for chart ${symbol}`);
       return cached;
@@ -211,7 +214,9 @@ export const fetchDailyTimeSeries = async (
       console.log(`[API] Cache miss for chart ${symbol}, will fetch from API`);
     }
   } else {
-    console.log(`[API] Bypassing cache for chart ${symbol} - fetching fresh data`);
+    console.log(
+      `[API] Bypassing cache for chart ${symbol} - fetching fresh data`
+    );
   }
 
   ensureApiKeyConfigured();
@@ -268,22 +273,23 @@ export const fetchDailyTimeSeries = async (
   return result;
 };
 
-export const fetchWeeklyTimeSeries = async (
-  symbol,
-  useCache = true
-) => {
+export const fetchWeeklyTimeSeries = async (symbol, useCache = true) => {
   // Check cache first
-  const cacheKey = CHART_CACHE_PREFIX + 'weekly_' + symbol;
+  const cacheKey = CHART_CACHE_PREFIX + "weekly_" + symbol;
   if (useCache) {
-    const cached = getCachedData(cacheKey, 'chart_weekly');
+    const cached = getCachedData(cacheKey, "chart_weekly");
     if (cached) {
       console.log(`[API] Cache hit for weekly chart ${symbol}`);
       return cached;
     } else {
-      console.log(`[API] Cache miss for weekly chart ${symbol}, will fetch from API`);
+      console.log(
+        `[API] Cache miss for weekly chart ${symbol}, will fetch from API`
+      );
     }
   } else {
-    console.log(`[API] Bypassing cache for weekly chart ${symbol} - fetching fresh data`);
+    console.log(
+      `[API] Bypassing cache for weekly chart ${symbol} - fetching fresh data`
+    );
   }
 
   ensureApiKeyConfigured();
@@ -323,18 +329,116 @@ export const fetchWeeklyTimeSeries = async (
   // Convert to array and sort by date (API returns 20+ years of data)
   const dates = Object.keys(timeSeries).sort();
 
-  const result = dates.map((date) => ({
-    date,
-    timestamp: new Date(date).getTime() / 1000,
-    open: parseFloat(timeSeries[date]["1. open"]),
-    high: parseFloat(timeSeries[date]["2. high"]),
-    low: parseFloat(timeSeries[date]["3. low"]),
-    close: parseFloat(timeSeries[date]["5. adjusted close"]),
-    volume: parseInt(timeSeries[date]["6. volume"]),
-  }));
+  const result = dates.map((date) => {
+    const open = parseFloat(timeSeries[date]["1. open"]);
+    const high = parseFloat(timeSeries[date]["2. high"]);
+    const low = parseFloat(timeSeries[date]["3. low"]);
+    const close = parseFloat(timeSeries[date]["4. close"]);
+    const adjustedClose = parseFloat(timeSeries[date]["5. adjusted close"]);
+    const volume = parseInt(timeSeries[date]["6. volume"]);
+
+    // Calculate adjustment factor to apply consistently to all OHLC values
+    const adjustmentFactor = adjustedClose / close;
+
+    return {
+      date,
+      timestamp: new Date(date).getTime() / 1000,
+      open: open * adjustmentFactor,
+      high: high * adjustmentFactor,
+      low: low * adjustmentFactor,
+      close: adjustedClose,
+      volume: volume,
+    };
+  });
 
   // Cache the result
   console.log(`[API] Caching weekly chart data for ${symbol}`);
+  setCachedData(cacheKey, result);
+
+  return result;
+};
+
+export const fetchMonthlyTimeSeries = async (symbol, useCache = true) => {
+  // Check cache first
+  const cacheKey = CHART_CACHE_PREFIX + "monthly_" + symbol;
+  if (useCache) {
+    const cached = getCachedData(cacheKey, "chart_monthly");
+    if (cached) {
+      console.log(`[API] Cache hit for monthly chart ${symbol}`);
+      return cached;
+    } else {
+      console.log(
+        `[API] Cache miss for monthly chart ${symbol}, will fetch from API`
+      );
+    }
+  } else {
+    console.log(
+      `[API] Bypassing cache for monthly chart ${symbol} - fetching fresh data`
+    );
+  }
+
+  ensureApiKeyConfigured();
+
+  const response = await fetch(
+    `${API_BASE_URL}?function=TIME_SERIES_MONTHLY_ADJUSTED&symbol=${symbol}&apikey=${API_KEY}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch monthly time series for ${symbol}: ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+
+  const infoMessage = parseInformationMessage(data["Information"]);
+  if (infoMessage) {
+    throw new Error(infoMessage);
+  }
+
+  const noteMessage = parseInformationMessage(data["Note"]);
+  if (noteMessage) {
+    throw new Error(noteMessage);
+  }
+
+  // Check for API errors (invalid symbol, etc.)
+  if (data["Error Message"]) {
+    throw new Error(data["Error Message"]);
+  }
+
+  const timeSeries = data["Monthly Adjusted Time Series"];
+  if (!timeSeries) {
+    throw new Error(`No monthly time series data available for ${symbol}`);
+  }
+
+  // Convert to array and sort by date (API returns 20+ years of data)
+  const dates = Object.keys(timeSeries).sort();
+
+  const result = dates.map((date) => {
+    const open = parseFloat(timeSeries[date]["1. open"]);
+    const high = parseFloat(timeSeries[date]["2. high"]);
+    const low = parseFloat(timeSeries[date]["3. low"]);
+    const close = parseFloat(timeSeries[date]["4. close"]);
+    const adjustedClose = parseFloat(timeSeries[date]["5. adjusted close"]);
+    const volume = parseInt(timeSeries[date]["6. volume"]);
+    // Note: "7. dividend amount" is available but we're ignoring per requirements
+
+    // Calculate adjustment factor to apply consistently to all OHLC values
+    const adjustmentFactor = adjustedClose / close;
+
+    return {
+      date,
+      timestamp: new Date(date).getTime() / 1000,
+      open: open * adjustmentFactor,
+      high: high * adjustmentFactor,
+      low: low * adjustmentFactor,
+      close: adjustedClose,
+      volume: volume,
+    };
+  });
+
+  // Cache the result
+  console.log(`[API] Caching monthly chart data for ${symbol}`);
   setCachedData(cacheKey, result);
 
   return result;
@@ -349,17 +453,17 @@ export const fetchListingStatus = async () => {
       const isValid = Date.now() - timestamp < LISTING_CACHE_DURATION;
 
       if (isValid) {
-        console.log('Cache hit for listing status');
+        console.log("Cache hit for listing status");
         return data;
       }
     } catch (error) {
-      console.warn('Cache read error for listing status:', error);
+      console.warn("Cache read error for listing status:", error);
     }
   }
 
   ensureApiKeyConfigured();
 
-  console.log('Fetching listing status from API...');
+  console.log("Fetching listing status from API...");
   const response = await fetch(
     `${API_BASE_URL}?function=LISTING_STATUS&apikey=${API_KEY}`
   );
@@ -372,44 +476,55 @@ export const fetchListingStatus = async () => {
   const csvText = await response.text();
 
   // Parse CSV to array of objects
-  const lines = csvText.trim().split('\n');
-  const headers = lines[0].split(',');
+  const lines = csvText.trim().split("\n");
+  const headers = lines[0].split(",");
 
   // Check for API errors in the FIRST line only (not in company names)
-  const firstLine = lines[0] || '';
-  if (firstLine.includes('Error Message') || firstLine.includes('Information') || firstLine.includes('Note:')) {
-    console.error('API Error Response:', csvText.substring(0, 500));
-    throw new Error('API limit reached or error occurred');
+  const firstLine = lines[0] || "";
+  if (
+    firstLine.includes("Error Message") ||
+    firstLine.includes("Information") ||
+    firstLine.includes("Note:")
+  ) {
+    console.error("API Error Response:", csvText.substring(0, 500));
+    throw new Error("API limit reached or error occurred");
   }
 
-  console.log('CSV Headers:', headers);
-  console.log('First data line:', lines[1]);
-  console.log('Total lines:', lines.length);
+  console.log("CSV Headers:", headers);
+  console.log("First data line:", lines[1]);
+  console.log("Total lines:", lines.length);
 
-  const listings = lines.slice(1).map(line => {
-    const values = line.split(',');
-    const obj = {};
-    headers.forEach((header, index) => {
-      obj[header] = values[index];
-    });
-    return obj;
-  }).filter(listing =>
-    // Include US stocks and ETFs
-    (listing.assetType === 'Stock' || listing.assetType === 'ETF') &&
-    (listing.exchange === 'NASDAQ' || listing.exchange === 'NYSE' || listing.exchange === 'AMEX')
-  ).map(listing => ({
-    symbol: listing.symbol,
-    name: listing.name
-  }));
+  const listings = lines
+    .slice(1)
+    .map((line) => {
+      const values = line.split(",");
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index];
+      });
+      return obj;
+    })
+    .filter(
+      (listing) =>
+        // Include US stocks and ETFs
+        (listing.assetType === "Stock" || listing.assetType === "ETF") &&
+        (listing.exchange === "NASDAQ" ||
+          listing.exchange === "NYSE" ||
+          listing.exchange === "AMEX")
+    )
+    .map((listing) => ({
+      symbol: listing.symbol,
+      name: listing.name,
+    }));
 
-  console.log('Listings before filter:', lines.length - 1);
-  console.log('Listings after filter:', listings.length);
-  console.log('Sample listing:', listings[0]);
+  console.log("Listings before filter:", lines.length - 1);
+  console.log("Listings after filter:", listings.length);
+  console.log("Sample listing:", listings[0]);
 
   // Don't cache if no valid listings found
   if (listings.length === 0) {
-    console.error('No listings found after filtering. Headers:', headers);
-    throw new Error('No valid listings found');
+    console.error("No listings found after filtering. Headers:", headers);
+    throw new Error("No valid listings found");
   }
 
   // Cache the result
@@ -419,7 +534,7 @@ export const fetchListingStatus = async () => {
       JSON.stringify({ data: listings, timestamp: Date.now() })
     );
   } catch (error) {
-    console.warn('Cache write error for listing status:', error);
+    console.warn("Cache write error for listing status:", error);
   }
 
   return listings;

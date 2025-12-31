@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
-import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
-import { fetchDailyTimeSeries, fetchWeeklyTimeSeries } from '../services/alphaVantageApi';
+import { useEffect, useRef, useState } from "react";
+import {
+  createChart,
+  CandlestickSeries,
+  HistogramSeries,
+} from "lightweight-charts";
+import {
+  fetchDailyTimeSeries,
+  fetchWeeklyTimeSeries,
+  fetchMonthlyTimeSeries,
+} from "../services/alphaVantageApi";
 
-const TIME_RANGE_KEY = 'chart_time_range';
+const TIME_RANGE_KEY = "chart_time_range";
 
-const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
+const StockChart = ({ symbol = "AAPL", refreshTrigger = 0 }) => {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const resizeObserverRef = useRef(null);
@@ -17,10 +25,10 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
   const [timeRange, setTimeRange] = useState(() => {
     try {
       const saved = localStorage.getItem(TIME_RANGE_KEY);
-      return saved === 'weekly' ? 'weekly' : 'daily';
+      return saved === "weekly" || saved === "monthly" ? saved : "daily";
     } catch (error) {
-      console.warn('Error loading time range:', error);
-      return 'daily';
+      console.warn("Error loading time range:", error);
+      return "daily";
     }
   });
 
@@ -36,7 +44,7 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
 
     const cleanup = () => {
       if (resizeHandler) {
-        window.removeEventListener('resize', resizeHandler);
+        window.removeEventListener("resize", resizeHandler);
       }
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
@@ -58,38 +66,54 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
         const isRefresh = refreshTrigger !== previousRefreshTrigger.current;
         previousRefreshTrigger.current = refreshTrigger;
 
-        console.log(`[StockChart] Loading chart for ${symbol}, timeRange: ${timeRange}, isRefresh: ${isRefresh}, useCache: ${!isRefresh}`);
+        console.log(
+          `[StockChart] Loading chart for ${symbol}, timeRange: ${timeRange}, isRefresh: ${isRefresh}, useCache: ${!isRefresh}`
+        );
 
         // Bypass cache on refresh, use cache on symbol change
-        // Conditionally fetch daily or weekly data based on timeRange
-        const timeSeries = timeRange === 'weekly'
-          ? await fetchWeeklyTimeSeries(symbol, !isRefresh)
-          : await fetchDailyTimeSeries(symbol, !isRefresh);
+        // Conditionally fetch daily, weekly, or monthly data based on timeRange
+        const timeSeries =
+          timeRange === "monthly"
+            ? await fetchMonthlyTimeSeries(symbol, !isRefresh)
+            : timeRange === "weekly"
+            ? await fetchWeeklyTimeSeries(symbol, !isRefresh)
+            : await fetchDailyTimeSeries(symbol, !isRefresh);
 
-        console.log(`[StockChart] Successfully loaded ${timeRange} chart data for ${symbol}, ${timeSeries.length} data points`);
+        console.log(
+          `[StockChart] Successfully loaded ${timeRange} chart data for ${symbol}, ${timeSeries.length} data points`
+        );
 
         if (!isMounted) {
-          console.log(`[StockChart] Component unmounted, skipping chart creation for ${symbol}`);
+          console.log(
+            `[StockChart] Component unmounted, skipping chart creation for ${symbol}`
+          );
           return;
         }
 
         if (!chartContainerRef.current) {
-          console.error(`[StockChart] Chart container ref is null for ${symbol}`);
+          console.error(
+            `[StockChart] Chart container ref is null for ${symbol}`
+          );
           return;
         }
 
         // Create chart
-        const containerWidth = chartContainerRef.current.clientWidth || chartContainerRef.current.offsetWidth || 800;
-        console.log(`[StockChart] Creating chart for ${symbol}, container width: ${containerWidth}`);
+        const containerWidth =
+          chartContainerRef.current.clientWidth ||
+          chartContainerRef.current.offsetWidth ||
+          800;
+        console.log(
+          `[StockChart] Creating chart for ${symbol}, container width: ${containerWidth}`
+        );
 
         chart = createChart(chartContainerRef.current, {
           layout: {
-            background: { color: '#1f2937' },
-            textColor: '#9ca3af',
+            background: { color: "#18181b" },
+            textColor: "#9ca3af",
           },
           grid: {
-            vertLines: { color: 'rgba(75, 85, 99, 0.3)' },
-            horzLines: { color: 'rgba(75, 85, 99, 0.3)' },
+            vertLines: { color: "rgba(39, 39, 42, 0.5)" },
+            horzLines: { color: "rgba(39, 39, 42, 0.5)" },
           },
           width: containerWidth,
           height: 384, // h-96 = 384px
@@ -101,27 +125,33 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
             rightBarStaysOnScroll: true,
             minBarSpacing: 0.5,
           },
+          rightPriceScale: {
+            autoScale: true,
+            mode: 0, // Normal price scale
+            alignLabels: true,
+            borderVisible: true,
+          },
         });
 
         chartRef.current = chart;
 
         // Add candlestick series (v5 API)
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
-          upColor: 'rgb(34, 197, 94)',
-          downColor: 'rgb(239, 68, 68)',
-          borderUpColor: 'rgb(34, 197, 94)',
-          borderDownColor: 'rgb(239, 68, 68)',
-          wickUpColor: 'rgb(34, 197, 94)',
-          wickDownColor: 'rgb(239, 68, 68)',
+          upColor: "rgb(0, 200, 5)",
+          downColor: "rgb(255, 80, 0)",
+          borderUpColor: "rgb(0, 200, 5)",
+          borderDownColor: "rgb(255, 80, 0)",
+          wickUpColor: "rgb(0, 200, 5)",
+          wickDownColor: "rgb(255, 80, 0)",
         });
 
         // Add volume histogram series
         const volumeSeries = chart.addSeries(HistogramSeries, {
-          color: 'rgba(76, 175, 254, 0.5)',
+          color: "rgba(0, 200, 5, 0.3)",
           priceFormat: {
-            type: 'volume',
+            type: "volume",
           },
-          priceScaleId: 'volume',
+          priceScaleId: "volume",
         });
 
         // Configure the volume price scale to take up ~25% at the bottom
@@ -141,7 +171,7 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
         });
 
         // Convert data to lightweight-charts format
-        const candleData = timeSeries.map(data => ({
+        const candleData = timeSeries.map((data) => ({
           time: data.date, // lightweight-charts expects 'YYYY-MM-DD' format
           open: data.open,
           high: data.high,
@@ -149,10 +179,13 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
           close: data.close,
         }));
 
-        const volumeData = timeSeries.map(data => ({
+        const volumeData = timeSeries.map((data) => ({
           time: data.date,
           value: data.volume,
-          color: data.close >= data.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+          color:
+            data.close >= data.open
+              ? "rgba(0, 200, 5, 0.3)"
+              : "rgba(255, 80, 0, 0.3)",
         }));
 
         candlestickSeries.setData(candleData);
@@ -183,7 +216,7 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
           if (data) {
             // Find the corresponding time series entry to get volume
             const dateStr = param.time;
-            const matchingData = timeSeries.find(d => d.date === dateStr);
+            const matchingData = timeSeries.find((d) => d.date === dateStr);
 
             if (matchingData) {
               setLatestData(matchingData);
@@ -202,7 +235,10 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
           clearTimeout(resizeTimeout);
           resizeTimeout = setTimeout(() => {
             if (chartContainerRef.current && chart) {
-              const newWidth = chartContainerRef.current.clientWidth || chartContainerRef.current.offsetWidth || 800;
+              const newWidth =
+                chartContainerRef.current.clientWidth ||
+                chartContainerRef.current.offsetWidth ||
+                800;
               chart.applyOptions({
                 width: newWidth,
               });
@@ -211,7 +247,7 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
           }, 100);
         };
 
-        window.addEventListener('resize', resizeHandler);
+        window.addEventListener("resize", resizeHandler);
 
         // Use ResizeObserver for more responsive resizing
         resizeObserverRef.current = new ResizeObserver((entries) => {
@@ -230,7 +266,10 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
         // Trigger an immediate resize to ensure proper sizing
         setTimeout(() => {
           if (chartContainerRef.current && chart) {
-            const newWidth = chartContainerRef.current.clientWidth || chartContainerRef.current.offsetWidth || 800;
+            const newWidth =
+              chartContainerRef.current.clientWidth ||
+              chartContainerRef.current.offsetWidth ||
+              800;
             chart.applyOptions({
               width: newWidth,
             });
@@ -245,7 +284,7 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
 
     // Clear any existing chart before loading new one
     if (chartContainerRef.current) {
-      chartContainerRef.current.innerHTML = '';
+      chartContainerRef.current.innerHTML = "";
     }
 
     loadChartData();
@@ -258,56 +297,104 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
   }, [symbol, refreshTrigger, timeRange]);
 
   return (
-    <div className="w-full bg-gray-800 rounded-lg p-6">
-      <h2 className="text-2xl font-bold text-white mb-4">
-        {symbol}
-      </h2>
+    <div className="w-full bg-zinc-900 rounded-lg p-6">
+      <h2 className="text-2xl font-bold text-white mb-4">{symbol}</h2>
 
       {/* Time Range Toggle */}
       <div className="flex items-center gap-2 mb-3">
         <button
-          onClick={() => setTimeRange('daily')}
-          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-            timeRange === 'daily'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          onClick={() => setTimeRange("daily")}
+          className={`!px-3 !py-1 rounded-lg font-medium text-sm transition-all ${
+            timeRange === "daily"
+              ? "bg-emerald-600 text-white"
+              : "bg-zinc-800 text-gray-300 hover:bg-zinc-700"
           }`}
         >
-          Daily (100 days)
+          1D
         </button>
         <button
-          onClick={() => setTimeRange('weekly')}
-          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-            timeRange === 'weekly'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          onClick={() => setTimeRange("weekly")}
+          className={`!px-3 !py-1 rounded-lg font-medium text-sm transition-all ${
+            timeRange === "weekly"
+              ? "bg-emerald-600 text-white"
+              : "bg-zinc-800 text-gray-300 hover:bg-zinc-700"
           }`}
         >
-          Weekly (20+ years)
+          1W
+        </button>
+        <button
+          onClick={() => setTimeRange("monthly")}
+          className={`!px-3 !py-1 rounded-lg font-medium text-sm transition-all ${
+            timeRange === "monthly"
+              ? "bg-emerald-600 text-white"
+              : "bg-zinc-800 text-gray-300 hover:bg-zinc-700"
+          }`}
+        >
+          1M
         </button>
       </div>
 
       {latestData && !loading && !error && (
-        <div className="bg-gray-700 rounded-lg p-3 mb-4 grid grid-cols-5 gap-4 text-sm">
+        <div className="bg-zinc-800 rounded-lg p-3 mb-4 grid grid-cols-5 gap-4 text-sm">
           <div>
             <div className="text-gray-400">Open</div>
-            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>${latestData.open.toFixed(2)}</div>
+            <div
+              className={`font-semibold ${
+                latestData.close >= latestData.open
+                  ? "text-emerald-400"
+                  : "text-orange-500"
+              }`}
+            >
+              ${latestData.open.toFixed(2)}
+            </div>
           </div>
           <div>
             <div className="text-gray-400">High</div>
-            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>${latestData.high.toFixed(2)}</div>
+            <div
+              className={`font-semibold ${
+                latestData.close >= latestData.open
+                  ? "text-emerald-400"
+                  : "text-orange-500"
+              }`}
+            >
+              ${latestData.high.toFixed(2)}
+            </div>
           </div>
           <div>
             <div className="text-gray-400">Low</div>
-            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>${latestData.low.toFixed(2)}</div>
+            <div
+              className={`font-semibold ${
+                latestData.close >= latestData.open
+                  ? "text-emerald-400"
+                  : "text-orange-500"
+              }`}
+            >
+              ${latestData.low.toFixed(2)}
+            </div>
           </div>
           <div>
             <div className="text-gray-400">Close</div>
-            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>${latestData.close.toFixed(2)}</div>
+            <div
+              className={`font-semibold ${
+                latestData.close >= latestData.open
+                  ? "text-emerald-400"
+                  : "text-orange-500"
+              }`}
+            >
+              ${latestData.close.toFixed(2)}
+            </div>
           </div>
           <div>
             <div className="text-gray-400">Volume</div>
-            <div className={`font-semibold ${latestData.close >= latestData.open ? 'text-green-400' : 'text-red-400'}`}>{(latestData.volume / 1000000).toFixed(2)}M</div>
+            <div
+              className={`font-semibold ${
+                latestData.close >= latestData.open
+                  ? "text-emerald-400"
+                  : "text-orange-500"
+              }`}
+            >
+              {(latestData.volume / 1000000).toFixed(2)}M
+            </div>
           </div>
         </div>
       )}
@@ -319,10 +406,22 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
       )}
       {error && (
         <div className="flex flex-col items-center justify-center h-96 text-gray-400">
-          <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          <svg
+            className="w-16 h-16 mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            />
           </svg>
-          <div className="text-lg font-semibold mb-2">Chart Data Unavailable</div>
+          <div className="text-lg font-semibold mb-2">
+            Chart Data Unavailable
+          </div>
           <div className="text-sm text-gray-500">
             {error.includes("API limit") || error.includes("daily limit")
               ? "Chart data will be available when API limit resets or from cache"
@@ -330,7 +429,11 @@ const StockChart = ({ symbol = 'AAPL', refreshTrigger = 0 }) => {
           </div>
         </div>
       )}
-      <div ref={chartContainerRef} className="h-96" style={{ display: loading || error ? 'none' : 'block' }} />
+      <div
+        ref={chartContainerRef}
+        className="h-96"
+        style={{ display: loading || error ? "none" : "block" }}
+      />
     </div>
   );
 };
