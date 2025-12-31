@@ -37,9 +37,9 @@ const SettingsModal = ({ onClose, isFirstTime = false }) => {
       setUserApiKey(trimmedKey);
       setSuccess(true);
 
-      // Close modal after brief delay to show success message
+      // Reload page after brief delay to show success message and refresh data
       setTimeout(() => {
-        onClose();
+        window.location.reload();
       }, 1000);
     } catch (err) {
       setError(err.message || "Failed to save API key");
